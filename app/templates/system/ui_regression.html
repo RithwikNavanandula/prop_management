@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% set active_page = "ui-qa" %}
+{% block title %}UI Regression QA - {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}UI Regression QA{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+        <h3>Automated Guard</h3>
+    </div>
+    <div style="padding:16px">
+        <p style="color:var(--text-secondary);margin-bottom:10px">
+            Run this before/after UI changes to catch map/modal/sidebar layering regressions.
+        </p>
+        <pre style="margin:0;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:12px"><code>python scripts/ui_regression_check.py</code></pre>
+        <p style="margin-top:10px;font-size:12px;color:var(--text-muted)">
+            Checks z-index ordering and required map/export hooks in templates.
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Manual Checklist</h3>
+    </div>
+    <div style="padding:16px">
+        <table>
+            <thead>
+                <tr>
+                    <th>Area</th>
+                    <th>Check</th>
+                    <th>Where</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Map + Modal</td>
+                    <td>Open <code>Add Property</code>. Modal and backdrop must stay above map tiles/markers.</td>
+                    <td><a href="/properties" target="_blank" rel="noopener">Properties</a></td>
+                </tr>
+                <tr>
+                    <td>Map Navigation</td>
+                    <td>Map marker popup opens Google/Apple/Waze/OSM links in new tab.</td>
+                    <td><a href="/properties" target="_blank" rel="noopener">Properties</a></td>
+                </tr>
+                <tr>
+                    <td>Sidebar Overlay</td>
+                    <td>On mobile width, sidebar overlay should dim the full page including maps.</td>
+                    <td><a href="/properties" target="_blank" rel="noopener">Properties</a></td>
+                </tr>
+                <tr>
+                    <td>Unit Form</td>
+                    <td>Editing units should preserve <code>0</code> values (bedrooms, parking, etc.).</td>
+                    <td><a href="/properties/1" target="_blank" rel="noopener">Property Detail</a></td>
+                </tr>
+                <tr>
+                    <td>Export Action</td>
+                    <td>Topbar Excel button exports the active screen workbook without errors.</td>
+                    <td><a href="/dashboard" target="_blank" rel="noopener">Dashboard</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

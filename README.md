@@ -31,3 +31,8 @@ Default admin:
 - `/portal/tenant`
 - `/portal/owner`
 - `/portal/vendor`
+
+## UI regression check
+```bash
+python scripts/ui_regression_check.py
+```

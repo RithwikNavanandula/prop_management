@@ -512,6 +512,19 @@ async def settings_page(request: Request, user: UserAccount = Depends(get_curren
     })
 
 
+@app.get("/qa/ui-regression", response_class=HTMLResponse)
+async def ui_regression_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
+                             db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login")
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    if role.id != 1:
+        return RedirectResponse(url="/dashboard")
+    return templates.TemplateResponse("system/ui_regression.html", {
+        "request": request, "user": user, "role": role, "settings": settings, "active_page": "ui-qa"
+    })
+
+
 @app.get("/workflow/scheduler", response_class=HTMLResponse)
 async def scheduler_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
                          db: Session = Depends(get_db)):
