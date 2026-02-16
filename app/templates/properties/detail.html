@@ -273,6 +273,18 @@
     let floorsCache = {};
     let currentUnits = [];
 
+    function parseOptionalInt(value) {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function parseOptionalFloat(value) {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = parseFloat(value);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
     async function openModal(id) {
         if (id === 'addUnitModal') {
             await populateBuildingDropdown('unitBldg');
@@ -451,10 +463,10 @@
 
         // Parsing
         ['building_id', 'floor_id', 'primary_tenant_id', 'bedrooms', 'bathrooms', 'rooms', 'balconies', 'parking_slots', 'min_lease_term', 'max_occupancy'].forEach(k => {
-            if (d[k]) d[k] = parseInt(d[k]) || null;
+            d[k] = parseOptionalInt(d[k]);
         });
         ['area_sqft', 'area_sqm', 'ceiling_height_ft', 'load_capacity_tons', 'market_rent'].forEach(k => {
-            if (d[k]) d[k] = parseFloat(d[k]) || null;
+            d[k] = parseOptionalFloat(d[k]);
         });
 
         if (editId) {
@@ -505,10 +517,10 @@
 
         // Parsing
         ['building_id', 'floor_number', 'total_units'].forEach(k => {
-            if (d[k]) d[k] = parseInt(d[k]) || null;
+            d[k] = parseOptionalInt(d[k]);
         });
         ['floor_area_sqft'].forEach(k => {
-            if (d[k]) d[k] = parseFloat(d[k]) || null;
+            d[k] = parseOptionalFloat(d[k]);
         });
 
         const bldgId = d.building_id;

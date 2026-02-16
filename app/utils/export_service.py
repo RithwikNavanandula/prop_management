@@ -48,6 +48,9 @@ def _to_dict(obj):
 
 
 def _apply_tenant_scope(query, model, user: UserAccount):
+    # Role 1 is system admin and should not be tenant-restricted for exports.
+    if user.role_id == 1:
+        return query
     if user.tenant_org_id and "tenant_org_id" in model.__table__.columns:
         return query.filter(model.tenant_org_id == user.tenant_org_id)
     return query
