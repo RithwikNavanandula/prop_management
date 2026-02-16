@@ -3,6 +3,15 @@
 {% block title %}Properties — {{ settings.APP_NAME }}{% endblock %}
 {% block page_title %}Properties{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+{% endblock %}
+
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
     <div style="display:flex;gap:12px;align-items:center">
@@ -42,6 +51,17 @@
             </tbody>
         </table>
     </div>
+</div>
+
+<div class="card" style="margin-top:20px">
+    <div class="card-header">
+        <h3>Property Map</h3>
+        <div style="font-size:12px;color:var(--text-secondary)">
+            Click markers to open property location in map apps
+        </div>
+    </div>
+    <div id="propertiesMap" style="height:420px;border-top:1px solid var(--border)"></div>
+    <div id="mapMeta" style="padding:10px 14px;font-size:12px;color:var(--text-muted)"></div>
 </div>
 
 <!-- Add Property Modal -->
@@ -151,6 +171,93 @@
 <script>
     function openModal(id) { document.getElementById(id).classList.add('active'); }
     function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    let propertiesMap;
+    let propertiesMapLayer;
+
+    function getMapTarget(property, app = 'google') {
+        const lat = Number(property.latitude);
+        const lng = Number(property.longitude);
+        const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+        const label = property.property_name || property.property_code || 'Property';
+        const address = [
+            property.address_line1,
+            property.address_line2,
+            property.city,
+            property.state,
+            property.postal_code,
+            property.country
+        ].filter(Boolean).join(', ');
+        const query = encodeURIComponent(address || label);
+
+        if (app === 'apple') {
+            return hasCoords
+                ? `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(label)}`
+                : `https://maps.apple.com/?q=${query}`;
+        }
+        if (app === 'osm') {
+            return hasCoords
+                ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`
+                : `https://www.openstreetmap.org/search?query=${query}`;
+        }
+        if (app === 'waze') {
+            return hasCoords
+                ? `https://waze.com/ul?ll=${lat}%2C${lng}&navigate=yes`
+                : `https://waze.com/ul?q=${query}`;
+        }
+        return hasCoords
+            ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+            : `https://www.google.com/maps/search/?api=1&query=${query}`;
+    }
+
+    function initPropertiesMap() {
+        if (propertiesMap || !window.L) return;
+        propertiesMap = L.map('propertiesMap', { zoomControl: true }).setView([39.5, -98.35], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(propertiesMap);
+        propertiesMapLayer = L.layerGroup().addTo(propertiesMap);
+    }
+
+    function renderPropertiesMap(items) {
+        initPropertiesMap();
+        if (!propertiesMap || !propertiesMapLayer) return;
+        propertiesMapLayer.clearLayers();
+
+        const points = [];
+        let mapped = 0;
+        items.forEach(p => {
+            const lat = Number(p.latitude);
+            const lng = Number(p.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            mapped += 1;
+            points.push([lat, lng]);
+            const popup = `
+                <div style="min-width:210px">
+                    <div style="font-weight:700;margin-bottom:4px">${p.property_name || '-'}</div>
+                    <div style="font-size:12px;color:#5f697a;margin-bottom:8px">${p.address_line1 || ''} ${p.city || ''}</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <a href="${getMapTarget(p, 'google')}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">Google</a>
+                        <a href="${getMapTarget(p, 'apple')}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">Apple</a>
+                        <a href="${getMapTarget(p, 'waze')}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">Waze</a>
+                        <a href="${getMapTarget(p, 'osm')}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">OSM</a>
+                    </div>
+                </div>
+            `;
+            L.marker([lat, lng]).bindPopup(popup).addTo(propertiesMapLayer);
+        });
+
+        const meta = document.getElementById('mapMeta');
+        meta.textContent = `${mapped} of ${items.length} properties mapped (requires latitude/longitude).`;
+
+        if (points.length === 1) {
+            propertiesMap.setView(points[0], 13);
+        } else if (points.length > 1) {
+            propertiesMap.fitBounds(points, { padding: [30, 30] });
+        } else {
+            propertiesMap.setView([39.5, -98.35], 4);
+        }
+    }
 
     async function loadProperties() {
         const type = document.getElementById('filterType').value;
@@ -163,6 +270,7 @@
             const tbody = document.getElementById('propertiesTable');
             if (!data.items.length) {
                 tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="icon">🏢</div><p>No properties found</p></td></tr>';
+                renderPropertiesMap([]);
                 return;
             }
             tbody.innerHTML = data.items.map(p => `
@@ -176,10 +284,12 @@
                 <td>${statusBadge(p.status)}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="location.href='/properties/${p.id}'">View</button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.open('${getMapTarget(p, 'google')}', '_blank', 'noopener')">Map</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteProperty(${p.id}, '${p.property_name?.replace(/'/g, "\\'") || ''}')">Delete</button>
                 </td>
             </tr>
         `).join('');
+            renderPropertiesMap(data.items);
         } catch (e) { console.error(e); }
     }
 
@@ -234,6 +344,7 @@
         } catch (e) { showToast(e.message, 'error'); }
     }
 
+    initPropertiesMap();
     loadProperties();
 </script>
 {% endblock %}

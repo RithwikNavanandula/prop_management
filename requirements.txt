@@ -19,3 +19,4 @@ httpx>=0.25.2
 requests>=2.31.0
 aiosmtplib>=3.0.1
 apscheduler>=3.10.4
+openpyxl>=3.1.0

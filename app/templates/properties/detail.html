@@ -19,8 +19,11 @@
 
 <div id="tabBuildings" class="card">
     <div class="card-header">
-        <h3>Buildings</h3><button class="btn btn-sm btn-primary" onclick="openModal('addBldgModal')">+ Add
-            Building</button>
+        <h3>Buildings</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-sm btn-secondary" onclick="openModal('importBldgUnitsModal')">Import Bldg + Units</button>
+            <button class="btn btn-sm btn-primary" onclick="openModal('addBldgModal')">+ Add Building</button>
+        </div>
     </div>
     <div id="buildingsList"></div>
 </div>
@@ -38,8 +41,8 @@
 
 <div id="tabUnits" class="card" style="display:none">
     <div class="card-header">
-        <h3>Units</h3>
-        <button class="btn btn-sm btn-primary" onclick="openModal('addUnitModal')">+ Add Unit</button>
+        <h3 id="unitModalHeadingLabel">Units</h3>
+        <button class="btn btn-sm btn-primary" onclick="openUnitCreateModal()">+ Add Unit</button>
     </div>
     <div class="table-container">
         <table>
@@ -72,10 +75,11 @@
 <div class="modal-backdrop" id="addUnitModal">
     <div class="modal" style="max-width:600px">
         <div class="modal-header">
-            <h3>Add Unit</h3><button class="modal-close" onclick="closeModal('addUnitModal')">×</button>
+            <h3 id="unitModalTitle">Add Unit</h3><button class="modal-close" onclick="closeModal('addUnitModal')">×</button>
         </div>
         <div class="modal-body">
             <form id="unitForm">
+                <input type="hidden" name="id" id="unitEditId">
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Building</label>
                         <select class="form-control" name="building_id" id="unitBldg"
@@ -179,6 +183,29 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="importBldgUnitsModal">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-header">
+            <h3>Import Buildings & Units</h3><button class="modal-close" onclick="closeModal('importBldgUnitsModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px">
+                Upload a CSV or Excel file. Supported sheets/columns:
+                <code>Buildings</code> and <code>Units</code>.
+                For CSV, use unit rows with fields like <code>building_code</code>, <code>building_name</code>, <code>floor_number</code>, <code>unit_number</code>.
+            </p>
+            <div class="form-group">
+                <label class="form-label">File</label>
+                <input class="form-control" type="file" id="bldgUnitsImportFile" accept=".csv,.xlsx,.xlsm">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('importBldgUnitsModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="importBuildingsUnits()">Import</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-backdrop" id="addBldgModal">
     <div class="modal">
         <div class="modal-header">
@@ -244,6 +271,7 @@
     const propId = {{ prop_id }};
     let buildings = [];
     let floorsCache = {};
+    let currentUnits = [];
 
     async function openModal(id) {
         if (id === 'addUnitModal') {
@@ -267,6 +295,55 @@
     }
 
     function closeModal(id) { document.getElementById(id).classList.remove('active') }
+
+    async function openUnitCreateModal() {
+        const form = document.getElementById('unitForm');
+        form.reset();
+        document.getElementById('unitEditId').value = '';
+        document.getElementById('unitModalTitle').textContent = 'Add Unit';
+        await openModal('addUnitModal');
+    }
+
+    async function openUnitEditModal(unitId) {
+        const unit = currentUnits.find(u => u.id === unitId);
+        if (!unit) return;
+        const form = document.getElementById('unitForm');
+        form.reset();
+        document.getElementById('unitEditId').value = String(unit.id);
+        document.getElementById('unitModalTitle').textContent = `Edit Unit ${unit.unit_number || ''}`.trim();
+        await openModal('addUnitModal');
+
+        form.querySelector('[name="unit_number"]').value = unit.unit_number || '';
+        form.querySelector('[name="unit_name"]').value = unit.unit_name || '';
+        form.querySelector('[name="unit_type"]').value = unit.unit_type || '1BHK';
+        form.querySelector('[name="usage_type"]').value = unit.usage_type || '';
+        form.querySelector('[name="primary_tenant_id"]').value = unit.primary_tenant_id || '';
+        form.querySelector('[name="area_sqft"]').value = unit.area_sqft || '';
+        form.querySelector('[name="area_sqm"]').value = unit.area_sqm || '';
+        form.querySelector('[name="bedrooms"]').value = unit.bedrooms ?? 0;
+        form.querySelector('[name="bathrooms"]').value = unit.bathrooms ?? 0;
+        form.querySelector('[name="rooms"]').value = unit.rooms ?? 0;
+        form.querySelector('[name="balconies"]').value = unit.balconies ?? 0;
+        form.querySelector('[name="parking_slots"]').value = unit.parking_slots ?? 0;
+        form.querySelector('[name="ceiling_height_ft"]').value = unit.ceiling_height_ft || '';
+        form.querySelector('[name="load_capacity_tons"]').value = unit.load_capacity_tons || '';
+        form.querySelector('[name="market_rent"]').value = unit.market_rent || '';
+        form.querySelector('[name="hvac_type"]').value = unit.hvac_type || '';
+        form.querySelector('[name="min_lease_term"]').value = unit.min_lease_term ?? 12;
+        form.querySelector('[name="max_occupancy"]').value = unit.max_occupancy ?? 1;
+        form.querySelector('[name="current_status"]').value = unit.current_status || 'Vacant';
+        form.querySelector('[name="status"]').value = unit.status || 'Active';
+        form.querySelector('[name="photo_url"]').value = unit.photo_url || '';
+        form.querySelector('[name="description"]').value = unit.description || '';
+
+        if (unit.building_id) {
+            form.querySelector('[name="building_id"]').value = String(unit.building_id);
+            await populateFloorDropdown('unitBldg', 'unitFloor');
+        }
+        if (unit.floor_id) {
+            form.querySelector('[name="floor_id"]').value = String(unit.floor_id);
+        }
+    }
 
     function switchTab(name, el) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); el.classList.add('active');
@@ -292,6 +369,7 @@
 
     async function loadUnits() {
         const data = await apiFetch(`/api/properties/${propId}/units`);
+        currentUnits = data.items || [];
         const tbody = document.getElementById('unitsTable');
         if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>No units yet</p></td></tr>'; return; }
 
@@ -311,6 +389,7 @@
                 </td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="location.href='/properties/${propId}/units/${u.id}'">View</button>
+                    <button class="btn btn-sm btn-secondary" onclick="openUnitEditModal(${u.id})">Edit</button>
                 </td>
             </tr>`;
         }).join('');
@@ -367,6 +446,8 @@
 
     async function saveUnit() {
         const d = {}; new FormData(document.getElementById('unitForm')).forEach((v, k) => { d[k] = v });
+        const editId = d.id ? parseInt(d.id, 10) : null;
+        delete d.id;
 
         // Parsing
         ['building_id', 'floor_id', 'primary_tenant_id', 'bedrooms', 'bathrooms', 'rooms', 'balconies', 'parking_slots', 'min_lease_term', 'max_occupancy'].forEach(k => {
@@ -376,8 +457,39 @@
             if (d[k]) d[k] = parseFloat(d[k]) || null;
         });
 
-        await apiFetch(`/api/properties/${propId}/units`, { method: 'POST', body: JSON.stringify(d) });
-        closeModal('addUnitModal'); showToast('Unit added'); loadUnits();
+        if (editId) {
+            await apiFetch(`/api/properties/${propId}/units/${editId}`, { method: 'PUT', body: JSON.stringify(d) });
+            showToast('Unit updated');
+        } else {
+            await apiFetch(`/api/properties/${propId}/units`, { method: 'POST', body: JSON.stringify(d) });
+            showToast('Unit added');
+        }
+        closeModal('addUnitModal');
+        loadUnits();
+    }
+
+    async function importBuildingsUnits() {
+        const input = document.getElementById('bldgUnitsImportFile');
+        const file = input.files && input.files[0];
+        if (!file) {
+            showToast('Select a file to import', 'error');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            const result = await apiFetch(`/api/properties/${propId}/import/buildings-units`, { method: 'POST', body: fd });
+            closeModal('importBldgUnitsModal');
+            input.value = '';
+            showToast(`Import done: ${result.stats.units_created} units created, ${result.stats.units_updated} updated`);
+            await loadBuildings();
+            await loadUnits();
+            if (result.error_count) {
+                showToast(`${result.error_count} rows had issues. Check server response for details.`, 'error');
+            }
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
     }
 
     async function saveBldg() {

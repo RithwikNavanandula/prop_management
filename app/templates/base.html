@@ -187,6 +187,12 @@
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="text" placeholder="Search this page" id="globalSearch">
                     </div>
+                    {% if role and role.role_name not in ['tenant', 'owner', 'vendor'] %}
+                    <button class="icon-btn" id="excelExportBtn" type="button" title="Export current screen to Excel"
+                        onclick="exportCurrentScreen()">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </button>
+                    {% endif %}
                     <button class="icon-btn" id="themeSwitcher" type="button" title="Switch theme">
                         <i class="fa-solid fa-palette"></i>
                     </button>
@@ -263,6 +269,17 @@
                 'Disposed': 'danger', 'Billed': 'info'
             };
             return `<span class="badge badge-${map[status] || 'neutral'}">${status || '-'}</span>`;
+        }
+
+        function exportCurrentScreen() {
+            const injectedActivePage = {{ active_page|default('', true)|tojson }};
+            let page = injectedActivePage;
+            if (!page) {
+                const parts = window.location.pathname.split('/').filter(Boolean);
+                page = parts.length ? parts[0] : 'dashboard';
+            }
+            const target = `/api/export/excel?page=${encodeURIComponent(page)}`;
+            window.open(target, '_blank');
         }
 
         (function initShell() {

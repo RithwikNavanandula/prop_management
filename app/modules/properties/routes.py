@@ -1,5 +1,7 @@
 """Property CRUD routes."""
 import logging
+import csv
+import io
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -16,7 +18,7 @@ from app.utils.qrcode_service import generate_qr_code
 from app.modules.compliance.models import Document
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, date
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -60,6 +62,29 @@ def _coerce_column_value(column, value):
             return python_type(value)
         except (TypeError, ValueError, InvalidOperation) as exc:
             raise ValueError("invalid numeric value") from exc
+
+    if python_type is datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("invalid datetime") from exc
+        raise ValueError("invalid datetime")
+
+    if python_type is date:
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value).date()
+            except ValueError:
+                try:
+                    return datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError as exc:
+                    raise ValueError("invalid date") from exc
+        raise ValueError("invalid date")
 
     return value
 
@@ -201,33 +226,13 @@ def get_unit(prop_id: int, unit_id: int, db: Session = Depends(get_db), user: Us
 
 @router.post("/{prop_id}/units", status_code=201)
 def create_unit(prop_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    # 1. Prepare data dictionary with strict type conversion
-    unit_data = {}
-    for col in Unit.__table__.columns:
-        k = col.name
-        if k in ("id", "created_at", "updated_at", "property_id"):
-            continue
-            
-        v = data.get(k)
-        # Handle null-ish values
-        if v in (None, "", "NaN", "null"):
-            unit_data[k] = None
-            continue
-            
-        # Type conversion
-        if k in ("tenant_org_id", "building_id", "floor_id", "primary_tenant_id", "bedrooms", "bathrooms", "rooms", "balconies", "parking_slots", "min_lease_term", "max_occupancy"):
-            try:
-                unit_data[k] = int(v)
-            except (ValueError, TypeError):
-                unit_data[k] = None
-        elif k in ("area_sqft", "area_sqm", "ceiling_height_ft", "load_capacity_tons", "market_rent"):
-            try:
-                unit_data[k] = float(v)
-            except (ValueError, TypeError):
-                unit_data[k] = None
-        else:
-            unit_data[k] = v
-
+    unit_data = _sanitize_model_payload(
+        Unit,
+        data,
+        blocked_fields={"id", "created_at", "updated_at", "property_id", "created_by", "updated_by"},
+    )
+    if user.tenant_org_id:
+        unit_data["tenant_org_id"] = user.tenant_org_id
     unit = Unit(**unit_data)
     unit.property_id = prop_id
     unit.created_by = user.id
@@ -242,9 +247,15 @@ def update_unit(prop_id: int, unit_id: int, data: dict, db: Session = Depends(ge
     unit = db.query(Unit).filter(Unit.id == unit_id, Unit.property_id == prop_id).first()
     if not unit:
         raise HTTPException(404, "Unit not found")
-    for k, v in data.items():
-        if hasattr(unit, k) and k not in ("id", "created_at", "property_id"):
-            setattr(unit, k, v)
+    unit_data = _sanitize_model_payload(
+        Unit,
+        data,
+        blocked_fields={"id", "created_at", "updated_at", "property_id", "created_by", "updated_by"},
+    )
+    if user.tenant_org_id:
+        unit_data["tenant_org_id"] = user.tenant_org_id
+    for k, v in unit_data.items():
+        setattr(unit, k, v)
     unit.updated_by = user.id
     db.commit()
     db.refresh(unit)
@@ -365,6 +376,261 @@ def delete_floor(prop_id: int, bldg_id: int, floor_id: int, db: Session = Depend
     db.delete(floor)
     db.commit()
     return {"message": "Floor deleted"}
+
+
+def _normalized_row_keys(row: dict) -> dict:
+    normalized = {}
+    for key, value in row.items():
+        if key is None:
+            continue
+        normalized_key = str(key).strip().lower().replace(" ", "_").replace("-", "_")
+        normalized[normalized_key] = value
+    return normalized
+
+
+def _row_value(row: dict, *keys):
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                continue
+        return value
+    return None
+
+
+def _iter_sheet_rows(file_bytes: bytes, filename: str) -> tuple[list[dict], list[dict]]:
+    lower_name = filename.lower()
+    if lower_name.endswith(".csv"):
+        decoded = file_bytes.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(decoded))
+        units_rows = [_normalized_row_keys(dict(row)) for row in reader]
+        return [], units_rows
+
+    try:
+        from openpyxl import load_workbook
+    except ModuleNotFoundError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Excel import requires openpyxl. Install dependencies from requirements.txt",
+        ) from exc
+
+    workbook = load_workbook(io.BytesIO(file_bytes), data_only=True)
+
+    def sheet_to_rows(sheet_name: str) -> list[dict]:
+        if sheet_name not in workbook.sheetnames:
+            return []
+        ws = workbook[sheet_name]
+        values = list(ws.values)
+        if not values:
+            return []
+        header = [str(v).strip() if v is not None else "" for v in values[0]]
+        rows = []
+        for raw in values[1:]:
+            row = {}
+            for idx, column_name in enumerate(header):
+                if not column_name:
+                    continue
+                row[column_name] = raw[idx] if idx < len(raw) else None
+            rows.append(_normalized_row_keys(row))
+        return rows
+
+    building_rows = sheet_to_rows("Buildings")
+    units_rows = sheet_to_rows("Units")
+    if not units_rows and workbook.sheetnames:
+        units_rows = sheet_to_rows(workbook.sheetnames[0])
+    return building_rows, units_rows
+
+
+@router.post("/{prop_id}/import/buildings-units")
+async def import_buildings_and_units(
+    prop_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    prop = db.query(Property).filter(Property.id == prop_id, Property.is_deleted == False).first()
+    if not prop:
+        raise HTTPException(404, "Property not found")
+
+    if user.tenant_org_id and prop.tenant_org_id != user.tenant_org_id:
+        raise HTTPException(404, "Property not found")
+
+    if not file.filename:
+        raise HTTPException(400, "File name is required")
+    lower_name = file.filename.lower()
+    if not (lower_name.endswith(".csv") or lower_name.endswith(".xlsx") or lower_name.endswith(".xlsm")):
+        raise HTTPException(400, "Unsupported file type. Use .csv or .xlsx")
+
+    file_bytes = await file.read()
+    building_rows, unit_rows = _iter_sheet_rows(file_bytes, file.filename)
+    if not unit_rows and not building_rows:
+        raise HTTPException(400, "No rows found in import file")
+
+    tenant_org_id = prop.tenant_org_id or user.tenant_org_id
+    building_cache: dict[str, Building] = {}
+    floor_cache: dict[tuple[int, int], Floor] = {}
+    errors = []
+    stats = {
+        "buildings_created": 0,
+        "buildings_updated": 0,
+        "floors_created": 0,
+        "units_created": 0,
+        "units_updated": 0,
+    }
+
+    def upsert_building(row: dict, row_index: int) -> Optional[Building]:
+        code = _row_value(row, "building_code", "code")
+        name = _row_value(row, "building_name", "name")
+        if not code and not name:
+            return None
+
+        cache_key = (str(code).strip().upper() if code else str(name).strip().lower())
+        if cache_key in building_cache:
+            return building_cache[cache_key]
+
+        q = db.query(Building).filter(Building.property_id == prop_id, Building.is_deleted == False)
+        if code:
+            q = q.filter(Building.building_code == str(code).strip())
+        else:
+            q = q.filter(Building.building_name == str(name).strip())
+        building = q.first()
+
+        payload = {
+            "building_code": str(code).strip() if code else str(name).strip().upper().replace(" ", "-"),
+            "building_name": str(name).strip() if name else str(code).strip(),
+            "floors_count": _row_value(row, "floors_count"),
+            "year_built": _row_value(row, "year_built"),
+            "status": _row_value(row, "status", "building_status"),
+            "tenant_org_id": tenant_org_id,
+        }
+        clean_payload = _sanitize_model_payload(
+            Building,
+            payload,
+            blocked_fields={"id", "created_at", "updated_at", "property_id", "created_by", "updated_by"},
+        )
+
+        if building:
+            for key, value in clean_payload.items():
+                setattr(building, key, value)
+            building.updated_by = user.id
+            stats["buildings_updated"] += 1
+        else:
+            building = Building(**clean_payload)
+            building.property_id = prop_id
+            building.created_by = user.id
+            db.add(building)
+            db.flush()
+            stats["buildings_created"] += 1
+
+        building_cache[cache_key] = building
+        return building
+
+    for idx, row in enumerate(building_rows, start=2):
+        try:
+            upsert_building(row, idx)
+        except Exception as exc:
+            errors.append({"row": idx, "section": "buildings", "error": str(exc)})
+
+    for idx, row in enumerate(unit_rows, start=2):
+        try:
+            unit_number = _row_value(row, "unit_number", "unit_no")
+            if not unit_number:
+                continue
+
+            building = upsert_building(row, idx)
+            floor_id = None
+            if building:
+                floor_number = _row_value(row, "floor_number")
+                if floor_number is not None:
+                    floor_number_int = int(floor_number)
+                    floor_key = (building.id, floor_number_int)
+                    floor = floor_cache.get(floor_key)
+                    if not floor:
+                        floor = db.query(Floor).filter(
+                            Floor.building_id == building.id,
+                            Floor.floor_number == floor_number_int,
+                        ).first()
+                    if not floor:
+                        floor_payload = _sanitize_model_payload(
+                            Floor,
+                            {
+                                "tenant_org_id": tenant_org_id,
+                                "floor_number": floor_number_int,
+                                "floor_name": _row_value(row, "floor_name"),
+                                "status": _row_value(row, "floor_status", "status"),
+                            },
+                            blocked_fields={"id", "created_at", "updated_at", "building_id"},
+                        )
+                        floor = Floor(**floor_payload)
+                        floor.building_id = building.id
+                        db.add(floor)
+                        db.flush()
+                        stats["floors_created"] += 1
+                    floor_cache[floor_key] = floor
+                    floor_id = floor.id
+
+            unit_payload = {
+                "tenant_org_id": tenant_org_id,
+                "building_id": building.id if building else None,
+                "floor_id": floor_id,
+                "unit_number": str(unit_number).strip(),
+                "unit_name": _row_value(row, "unit_name"),
+                "unit_type": _row_value(row, "unit_type"),
+                "area_sqft": _row_value(row, "area_sqft"),
+                "area_sqm": _row_value(row, "area_sqm"),
+                "bedrooms": _row_value(row, "bedrooms"),
+                "bathrooms": _row_value(row, "bathrooms"),
+                "rooms": _row_value(row, "rooms"),
+                "balconies": _row_value(row, "balconies"),
+                "parking_slots": _row_value(row, "parking_slots"),
+                "ceiling_height_ft": _row_value(row, "ceiling_height_ft"),
+                "load_capacity_tons": _row_value(row, "load_capacity_tons"),
+                "hvac_type": _row_value(row, "hvac_type"),
+                "current_status": _row_value(row, "current_status"),
+                "market_rent": _row_value(row, "market_rent"),
+                "min_lease_term": _row_value(row, "min_lease_term"),
+                "max_occupancy": _row_value(row, "max_occupancy"),
+                "usage_type": _row_value(row, "usage_type"),
+                "status": _row_value(row, "status"),
+                "photo_url": _row_value(row, "photo_url"),
+                "description": _row_value(row, "description"),
+            }
+            clean_unit_payload = _sanitize_model_payload(
+                Unit,
+                unit_payload,
+                blocked_fields={"id", "created_at", "updated_at", "property_id", "created_by", "updated_by"},
+            )
+
+            uq = db.query(Unit).filter(Unit.property_id == prop_id, Unit.unit_number == clean_unit_payload["unit_number"])
+            if clean_unit_payload.get("building_id"):
+                uq = uq.filter(Unit.building_id == clean_unit_payload["building_id"])
+            unit = uq.first()
+            if unit:
+                for key, value in clean_unit_payload.items():
+                    setattr(unit, key, value)
+                unit.updated_by = user.id
+                stats["units_updated"] += 1
+            else:
+                unit = Unit(**clean_unit_payload)
+                unit.property_id = prop_id
+                unit.created_by = user.id
+                db.add(unit)
+                stats["units_created"] += 1
+        except Exception as exc:
+            errors.append({"row": idx, "section": "units", "error": str(exc)})
+
+    db.commit()
+    return {
+        "message": "Import completed",
+        "imported_rows": len(unit_rows),
+        "building_rows": len(building_rows),
+        "stats": stats,
+        "errors": errors[:100],
+        "error_count": len(errors),
+    }
 
 
 # --- Unit Assets (nested under properties – backward compat) ---
