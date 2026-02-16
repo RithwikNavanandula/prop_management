@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% set active_page = "accounting" %}
+{% block title %}Accounting — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Accounting & Finance{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <div class="tab active" onclick="switchAcctTab('coa',this)">Chart of Accounts</div>
+    <div class="tab" onclick="switchAcctTab('journals',this)">Journal Entries</div>
+    <div class="tab" onclick="switchAcctTab('reports',this)">Financial Reports</div>
+</div>
+
+<!-- Chart of Accounts Tab -->
+<div id="tabCOA">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+        <input type="text" class="form-control" style="width:250px" placeholder="Search accounts..." id="coaSearch"
+            oninput="loadCOA()">
+        <button class="btn btn-primary" onclick="openModal('addAccountModal')">+ Add Account</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Account Name</th>
+                        <th>Type</th>
+                        <th>Sub-Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="coaTableBody">
+                    <tr>
+                        <td colspan="5">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Journal Entries Tab -->
+<div id="tabJournals" style="display:none">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+        <input type="text" class="form-control" style="width:250px" placeholder="Search journals..." id="jeSearch">
+        <button class="btn btn-primary" onclick="openModal('addJournalModal')">+ New Journal Entry</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Journal #</th>
+                        <th>Description</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="jeTableBody">
+                    <tr>
+                        <td colspan="6">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Reports Tab -->
+<div id="tabReports" style="display:none">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">
+        <select class="form-control" id="reportType" style="width:200px">
+            <option value="balance-sheet">Balance Sheet</option>
+            <option value="profit-loss">Profit & Loss</option>
+            <option value="trial-balance">Trial Balance</option>
+        </select>
+        <input type="date" class="form-control" id="reportDate" style="width:180px">
+        <button class="btn btn-secondary" onclick="loadReport()">Generate</button>
+    </div>
+    <div class="card" id="reportResult">
+        <p style="text-align:center;padding:2rem;color:var(--text-muted)">Select a report type and generate.</p>
+    </div>
+</div>
+
+<!-- Add Account Modal -->
+<div class="modal-backdrop" id="addAccountModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Chart of Account</h3>
+            <button class="modal-close" onclick="closeModal('addAccountModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="addAccountForm">
+                <div class="form-group"><label class="form-label">Account Code*</label>
+                    <input type="text" name="account_code" required class="form-control">
+                </div>
+                <div class="form-group"><label class="form-label">Account Name*</label>
+                    <input type="text" name="account_name" required class="form-control">
+                </div>
+                <div class="form-group"><label class="form-label">Type*</label>
+                    <select name="account_type" class="form-control" required>
+                        <option value="Asset">Asset</option>
+                        <option value="Liability">Liability</option>
+                        <option value="Equity">Equity</option>
+                        <option value="Revenue">Revenue</option>
+                        <option value="Expense">Expense</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">Sub-Type</label>
+                    <input type="text" name="sub_type" class="form-control"
+                        placeholder="e.g. Current Asset, Fixed Asset">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addAccountModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createAccount()">Create Account</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Journal Modal -->
+<div class="modal-backdrop" id="addJournalModal">
+    <div class="modal" style="max-width:800px">
+        <div class="modal-header">
+            <h3>New Journal Entry</h3>
+            <button class="modal-close" onclick="closeModal('addJournalModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="addJournalForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Entry Date*</label>
+                        <input type="date" name="entry_date" required class="form-control">
+                    </div>
+                    <div class="form-group"><label class="form-label">Journal #*</label>
+                        <input type="text" name="journal_number" required class="form-control">
+                    </div>
+                </div>
+                <div class="form-group"><label class="form-label">Description*</label>
+                    <input type="text" name="description" required class="form-control">
+                </div>
+                <h4 style="margin:16px 0 8px">Lines</h4>
+                <div id="journalLines">
+                    <div class="line-row" style="display:flex;gap:10px;margin-bottom:10px">
+                        <input type="number" placeholder="Account ID" class="form-control" data-field="account_id"
+                            required style="flex:1">
+                        <input type="number" step="0.01" placeholder="Debit" class="form-control"
+                            data-field="debit_amount" style="width:120px">
+                        <input type="number" step="0.01" placeholder="Credit" class="form-control"
+                            data-field="credit_amount" style="width:120px">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="addJournalLine()">+ Add Line</button>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addJournalModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createJournal()">Post Entry</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function switchAcctTab(name, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tabCOA').style.display = name === 'coa' ? 'block' : 'none';
+        document.getElementById('tabJournals').style.display = name === 'journals' ? 'block' : 'none';
+        document.getElementById('tabReports').style.display = name === 'reports' ? 'block' : 'none';
+        if (name === 'journals') loadJournals();
+    }
+
+    // Set default report date to today
+    document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+
+    async function loadCOA() {
+        try {
+            const data = await apiFetch('/api/accounting/chart-of-accounts');
+            const tbody = document.getElementById('coaTableBody');
+            if (!data.items || !data.items.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No accounts found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.items.map(acc => `
+                <tr>
+                    <td><strong>${acc.account_code}</strong></td>
+                    <td>${acc.account_name}</td>
+                    <td><span class="badge badge-${getAccTypeColor(acc.account_type)}">${acc.account_type}</span></td>
+                    <td>${acc.sub_type || '-'}</td>
+                    <td>${statusBadge(acc.status || 'Active')}</td>
+                </tr>
+            `).join('');
+        } catch (e) { console.error('COA load error:', e); }
+    }
+
+    async function loadJournals() {
+        try {
+            const data = await apiFetch('/api/accounting/journal-entries');
+            const tbody = document.getElementById('jeTableBody');
+            if (!data.items || !data.items.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No journal entries found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.items.map(je => `
+                <tr>
+                    <td>${formatDate(je.entry_date)}</td>
+                    <td><strong>${je.journal_number}</strong></td>
+                    <td>${je.description}</td>
+                    <td>${formatCurrency(je.total_debit)}</td>
+                    <td>${formatCurrency(je.total_credit)}</td>
+                    <td>${statusBadge(je.status || 'Posted')}</td>
+                </tr>
+            `).join('');
+        } catch (e) { console.error('Journal load error:', e); }
+    }
+
+    async function loadReport() {
+        const type = document.getElementById('reportType').value;
+        const date = document.getElementById('reportDate').value;
+        try {
+            if (type === 'balance-sheet') {
+                const data = await apiFetch(`/api/accounting/reports/balance-sheet?as_of=${date}`);
+                renderBalanceSheet(data);
+            } else if (type === 'profit-loss') {
+                const data = await apiFetch(`/api/accounting/reports/profit-loss?as_of=${date}`);
+                renderProfitLoss(data);
+            } else if (type === 'trial-balance') {
+                const data = await apiFetch(`/api/accounting/reports/trial-balance?as_of=${date}`);
+                renderTrialBalance(data);
+            }
+        } catch (e) {
+            document.getElementById('reportResult').innerHTML = `<p style="padding:2rem;text-align:center;color:var(--danger)">Error: ${e.message}</p>`;
+        }
+    }
+
+    function renderBalanceSheet(data) {
+        let html = '<h3 style="padding:16px 16px 0">Balance Sheet</h3>';
+        html += '<table style="width:100%"><thead><tr><th>Account</th><th>Type</th><th style="text-align:right">Balance</th></tr></thead><tbody>';
+        let totalAsset = 0, totalLiabEquity = 0;
+        (data.data || []).forEach(row => {
+            html += `<tr><td>${row.account_code} - ${row.account_name}</td><td>${row.type}</td><td style="text-align:right">${formatCurrency(row.balance)}</td></tr>`;
+            if (row.type === 'Asset') totalAsset += row.balance;
+            else totalLiabEquity += row.balance;
+        });
+        html += `<tr style="font-weight:bold"><td>TOTAL ASSETS</td><td></td><td style="text-align:right">${formatCurrency(totalAsset)}</td></tr>`;
+        html += `<tr style="font-weight:bold"><td>TOTAL LIAB & EQUITY</td><td></td><td style="text-align:right">${formatCurrency(totalLiabEquity)}</td></tr>`;
+        html += '</tbody></table>';
+        document.getElementById('reportResult').innerHTML = html;
+    }
+
+    function renderProfitLoss(data) {
+        let html = '<h3 style="padding:16px 16px 0">Profit & Loss</h3>';
+        html += '<table style="width:100%"><thead><tr><th>Account</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>';
+        let totalRevenue = 0, totalExpense = 0;
+        (data.data || []).forEach(row => {
+            html += `<tr><td>${row.account_code || ''} - ${row.account_name || ''}</td><td>${row.type || ''}</td><td style="text-align:right">${formatCurrency(row.balance || row.amount || 0)}</td></tr>`;
+            if (row.type === 'Revenue') totalRevenue += (row.balance || row.amount || 0);
+            if (row.type === 'Expense') totalExpense += (row.balance || row.amount || 0);
+        });
+        html += `<tr style="font-weight:bold"><td>Total Revenue</td><td></td><td style="text-align:right">${formatCurrency(totalRevenue)}</td></tr>`;
+        html += `<tr style="font-weight:bold"><td>Total Expenses</td><td></td><td style="text-align:right">${formatCurrency(totalExpense)}</td></tr>`;
+        html += `<tr style="font-weight:bold;color:var(--success)"><td>Net Income</td><td></td><td style="text-align:right">${formatCurrency(totalRevenue - totalExpense)}</td></tr>`;
+        html += '</tbody></table>';
+        document.getElementById('reportResult').innerHTML = html;
+    }
+
+    function renderTrialBalance(data) {
+        let html = '<h3 style="padding:16px 16px 0">Trial Balance</h3>';
+        html += '<table style="width:100%"><thead><tr><th>Account</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead><tbody>';
+        let totalDebit = 0, totalCredit = 0;
+        (data.data || []).forEach(row => {
+            const debit = row.debit || 0;
+            const credit = row.credit || 0;
+            totalDebit += debit;
+            totalCredit += credit;
+            html += `<tr><td>${row.account_code || ''} - ${row.account_name || ''}</td><td style="text-align:right">${formatCurrency(debit)}</td><td style="text-align:right">${formatCurrency(credit)}</td></tr>`;
+        });
+        html += `<tr style="font-weight:bold"><td>TOTALS</td><td style="text-align:right">${formatCurrency(totalDebit)}</td><td style="text-align:right">${formatCurrency(totalCredit)}</td></tr>`;
+        html += '</tbody></table>';
+        document.getElementById('reportResult').innerHTML = html;
+    }
+
+    function getAccTypeColor(type) {
+        const map = { 'Asset': 'success', 'Liability': 'warning', 'Revenue': 'info', 'Equity': 'purple', 'Expense': 'danger' };
+        return map[type] || 'neutral';
+    }
+
+    let lineCount = 1;
+    function addJournalLine() {
+        const div = document.createElement('div');
+        div.className = 'line-row';
+        div.style = "display:flex;gap:10px;margin-bottom:10px;";
+        div.innerHTML = `
+            <input type="number" placeholder="Account ID" class="form-control" data-field="account_id" required style="flex:1">
+            <input type="number" step="0.01" placeholder="Debit" class="form-control" data-field="debit_amount" style="width:120px">
+            <input type="number" step="0.01" placeholder="Credit" class="form-control" data-field="credit_amount" style="width:120px">
+            <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">×</button>
+        `;
+        document.getElementById('journalLines').appendChild(div);
+        lineCount++;
+    }
+
+    async function createAccount() {
+        const fd = new FormData(document.getElementById('addAccountForm'));
+        const data = Object.fromEntries(fd.entries());
+        try {
+            await apiFetch('/api/accounting/chart-of-accounts', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            closeModal('addAccountModal');
+            showToast('Account created');
+            loadCOA();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function createJournal() {
+        const form = document.getElementById('addJournalForm');
+        const entry_date = form.querySelector('[name="entry_date"]').value;
+        const journal_number = form.querySelector('[name="journal_number"]').value;
+        const description = form.querySelector('[name="description"]').value;
+
+        // Collect lines
+        const lines = [];
+        document.querySelectorAll('#journalLines .line-row').forEach(row => {
+            const accountId = row.querySelector('[data-field="account_id"]').value;
+            const debit = row.querySelector('[data-field="debit_amount"]').value;
+            const credit = row.querySelector('[data-field="credit_amount"]').value;
+            if (accountId) {
+                lines.push({
+                    account_id: parseInt(accountId),
+                    debit_amount: parseFloat(debit) || 0,
+                    credit_amount: parseFloat(credit) || 0
+                });
+            }
+        });
+
+        if (!lines.length) {
+            showToast('At least one line is required', 'error');
+            return;
+        }
+
+        // Calculate totals
+        const totalDebit = lines.reduce((s, l) => s + l.debit_amount, 0);
+        const totalCredit = lines.reduce((s, l) => s + l.credit_amount, 0);
+
+        try {
+            await apiFetch('/api/accounting/journal-entries', {
+                method: 'POST',
+                body: JSON.stringify({
+                    entry_date,
+                    journal_number,
+                    description,
+                    total_debit: totalDebit,
+                    total_credit: totalCredit,
+                    lines,
+                    status: 'Posted'
+                })
+            });
+            closeModal('addJournalModal');
+            showToast('Journal entry posted');
+            loadJournals();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // Initial load
+    loadCOA();
+</script>
+{% endblock %}

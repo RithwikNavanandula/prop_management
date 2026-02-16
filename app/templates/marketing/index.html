@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% set active_page = "marketing" %}
+{% block title %}Marketing — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Marketing & Leasing{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab(event, 'listings')">Listings</button>
+    <button class="tab-btn" onclick="openTab(event, 'leads')">Leads Pipeline</button>
+    <button class="tab-btn" onclick="openTab(event, 'applications')">Applications</button>
+</div>
+
+<!-- Listings Tab -->
+<div id="listings" class="tab-content" style="display:block;">
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openModal('createListingModal')">Create Listing</button>
+    </div>
+    <div class="grid-3" id="listingsGrid">
+        <!-- Populated by JS -->
+    </div>
+</div>
+
+<!-- Leads Tab -->
+<div id="leads" class="tab-content">
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Last Contact</th>
+                </tr>
+            </thead>
+            <tbody id="leadsTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Applications Tab -->
+<div id="applications" class="tab-content">
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Applicant</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="appsTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        if (tabName === 'listings') loadListings();
+        if (tabName === 'leads') loadLeads();
+        if (tabName === 'applications') loadApps();
+    }
+
+    async function loadListings() {
+        const resp = await fetch('/api/marketing/listings');
+        const data = await resp.json();
+        const grid = document.getElementById('listingsGrid');
+        grid.innerHTML = '';
+        data.items.forEach(l => {
+            grid.innerHTML += `
+                <div class="stat-card">
+                    <h3>${l.listing_title}</h3>
+                    <p style="color:#aaa;">${l.listing_description || 'No description'}</p>
+                    <div style="margin-top:10px; font-weight:bold;">${formatCurrency(l.rent_from)} - ${formatCurrency(l.rent_to)}</div>
+                    <div style="margin-top:10px;">
+                        <span class="badge badge-${l.is_published ? 'success' : 'secondary'}">
+                            ${l.is_published ? 'Published' : 'Draft'}
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    async function loadLeads() {
+        const resp = await fetch('/api/marketing/leads');
+        const data = await resp.json();
+        const tbody = document.getElementById('leadsTable');
+        tbody.innerHTML = '';
+        data.items.forEach(l => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${l.first_name} ${l.last_name}</td>
+                    <td>${l.lead_source_id || '-'}</td>
+                    <td><span class="badge badge-info">${l.lead_status}</span></td>
+                    <td>${l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString() : '-'}</td>
+                </tr>
+            `;
+        });
+    }
+
+    async function loadApps() {
+        const resp = await fetch('/api/marketing/applications');
+        const data = await resp.json();
+        const tbody = document.getElementById('appsTable');
+        tbody.innerHTML = '';
+        data.items.forEach(a => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>App #${a.id}</td>
+                    <td>Unit #${a.unit_id || '-'}</td>
+                    <td>${a.status}</td>
+                    <td>${a.application_date}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // Initial load
+    loadListings();
+</script>
+{% endblock %}

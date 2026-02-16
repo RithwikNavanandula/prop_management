@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set active_page = "compliance" %}
+{% block title %}Compliance — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Compliance & Documents{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab(event, 'requirements')">Requirements</button>
+    <button class="tab-btn" onclick="openTab(event, 'documents')">Documents</button>
+    <button class="tab-btn" onclick="openTab(event, 'inspections')">Inspections</button>
+</div>
+
+<!-- Requirements Tab -->
+<div id="requirements" class="tab-content" style="display:block;">
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Requirement Name</th>
+                    <th>Entity Type</th>
+                    <th>Frequency</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="reqTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Documents Tab -->
+<div id="documents" class="tab-content">
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>File Name</th>
+                    <th>Type</th>
+                    <th>Expiry Date</th>
+                    <th>Signed</th>
+                </tr>
+            </thead>
+            <tbody id="docTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Inspections Tab -->
+<div id="inspections" class="tab-content">
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openModal('addInspectionModal')">Schedule Inspection</button>
+    </div>
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Property/Unit</th>
+                    <th>Scheduled Date</th>
+                    <th>Inspector</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="inspTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        if (tabName === 'requirements') loadReqs();
+        if (tabName === 'documents') loadDocs();
+        if (tabName === 'inspections') loadInsp();
+    }
+
+    async function loadReqs() {
+        const resp = await fetch('/api/compliance/requirements');
+        const data = await resp.json();
+        const tbody = document.getElementById('reqTable');
+        tbody.innerHTML = '';
+        data.items.forEach(r => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${r.requirement_name}</td>
+                    <td>${r.entity_type || '-'}</td>
+                    <td>${r.frequency || '-'}</td>
+                    <td>${r.is_active ? 'Active' : 'Inactive'}</td>
+                </tr>
+            `;
+        });
+    }
+
+    async function loadDocs() {
+        const resp = await fetch('/api/compliance/documents');
+        const data = await resp.json();
+        const tbody = document.getElementById('docTable');
+        tbody.innerHTML = '';
+        data.items.forEach(d => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${d.file_name}</td>
+                    <td>${d.document_type_id || '-'}</td>
+                    <td>${d.expiry_date || '-'}</td>
+                    <td>${d.is_signed ? 'Yes' : 'No'}</td>
+                </tr>
+            `;
+        });
+    }
+
+    async function loadInsp() {
+        const resp = await fetch('/api/compliance/inspections');
+        const data = await resp.json();
+        const tbody = document.getElementById('inspTable');
+        tbody.innerHTML = '';
+        data.items.forEach(i => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${i.inspection_type}</td>
+                    <td>${i.unit_id ? 'Unit #' + i.unit_id : (i.property_id ? 'Prop #' + i.property_id : '-')}</td>
+                    <td>${i.scheduled_date || '-'}</td>
+                    <td>${i.inspector_id || '-'}</td>
+                    <td>${i.status}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // Initial load
+    loadReqs();
+</script>
+{% endblock %}

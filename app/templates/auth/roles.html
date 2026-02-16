@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Roles & Permissions - {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Roles & Permissions{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>System Roles</h3>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Role Name</th>
+                    <th>Description</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="roleTableBody">
+                <tr>
+                    <td colspan="4" class="empty-state">Loading roles...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- View Permissions Modal -->
+<div class="modal-backdrop" id="roleModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Role Permissions: <span id="roleNameDisplay"></span></h3>
+            <button class="modal-close" onclick="closeModal('roleModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <pre id="permissionsJson"
+                style="background:var(--bg-primary);padding:16px;border-radius:var(--radius-sm);color:var(--accent-light);overflow:auto;max-height:400px;font-family:monospace;font-size:12px;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadRoles() {
+        try {
+            const roles = await apiFetch('/api/auth/roles');
+            renderRoles(roles);
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    function renderRoles(roles) {
+        const tbody = document.getElementById('roleTableBody');
+        tbody.innerHTML = roles.map(r => `
+            <tr>
+                <td><span class="badge badge-purple">${r.role_name}</span></td>
+                <td>${r.description || '-'}</td>
+                <td><code style="font-size:11px">${Object.keys(r.permissions || {}).join(', ')}</code></td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick='viewPerms(${JSON.stringify(r)})'>👁️ View Perms</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function viewPerms(r) {
+        document.getElementById('roleNameDisplay').innerText = r.role_name;
+        document.getElementById('permissionsJson').innerText = JSON.stringify(r.permissions, null, 4);
+        document.getElementById('roleModal').classList.add('active');
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    loadRoles();
+</script>
+{% endblock %}

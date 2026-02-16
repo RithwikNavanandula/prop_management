@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set active_page = "workflow" %}
+{% block title %}Workflow — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Workflow Automation{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab(event, 'workflows')">Workflows</button>
+    <button class="tab-btn" onclick="openTab(event, 'logs')">Execution Logs</button>
+</div>
+
+<!-- Workflows Tab -->
+<div id="workflows" class="tab-content" style="display:block;">
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openModal('createWorkflowModal')">Create Workflow</button>
+    </div>
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Trigger</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="wfTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Logs Tab -->
+<div id="logs" class="tab-content">
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Workflow ID</th>
+                    <th>Triggered By</th>
+                    <th>Triggered At</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="logTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+
+        if (tabName === 'workflows') loadWorkflows();
+        if (tabName === 'logs') loadLogs();
+    }
+
+    async function loadWorkflows() {
+        const resp = await fetch('/api/workflow/definitions');
+        const data = await resp.json();
+        const tbody = document.getElementById('wfTable');
+        tbody.innerHTML = '';
+        data.items.forEach(w => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${w.workflow_name}</td>
+                    <td>${w.trigger_event || '-'}</td>
+                    <td>${w.description || '-'}</td>
+                    <td><span class="badge badge-${w.is_active ? 'success' : 'secondary'}">${w.is_active ? 'Active' : 'Inactive'}</span></td>
+                </tr>
+            `;
+        });
+    }
+
+    async function loadLogs() {
+        const resp = await fetch('/api/workflow/execution-logs');
+        const data = await resp.json();
+        const tbody = document.getElementById('logTable');
+        tbody.innerHTML = '';
+        data.items.forEach(l => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${l.workflow_id}</td>
+                    <td>${l.triggered_by}</td>
+                    <td>${new Date(l.triggered_at).toLocaleString()}</td>
+                    <td>${l.status}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // Initial load
+    loadWorkflows();
+</script>
+{% endblock %}

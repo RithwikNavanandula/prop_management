@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PropManager Pro{% endblock %}</title>
+    <meta name="description" content="PropManager Pro - Property management workspace">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+        integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function () {
+            const theme = localStorage.getItem('app-theme') || 'light-cloud';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-layout">
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo">PM</div>
+                <div>
+                    <h1>PropManager Pro</h1>
+                    <span>Enterprise Workspace</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+                        <span class="icon"><i class="fa-solid fa-chart-line"></i></span><span>Dashboard</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Management</div>
+                    <a href="/properties" class="nav-item {% if active_page == 'properties' %}active{% endif %}" id="nav-properties">
+                        <span class="icon"><i class="fa-solid fa-building"></i></span><span>Properties</span>
+                    </a>
+                    <a href="/tenants" class="nav-item {% if active_page == 'tenants' %}active{% endif %}" id="nav-tenants">
+                        <span class="icon"><i class="fa-solid fa-users"></i></span><span>Tenants</span>
+                    </a>
+                    <a href="/owners" class="nav-item {% if active_page == 'owners' %}active{% endif %}" id="nav-owners">
+                        <span class="icon"><i class="fa-solid fa-user-tie"></i></span><span>Owners</span>
+                    </a>
+                    <a href="/leases" class="nav-item {% if active_page == 'leases' %}active{% endif %}" id="nav-leases">
+                        <span class="icon"><i class="fa-solid fa-file-signature"></i></span><span>Leases</span>
+                    </a>
+                    <a href="/crm" class="nav-item {% if active_page == 'crm' %}active{% endif %}" id="nav-crm">
+                        <span class="icon"><i class="fa-solid fa-comments"></i></span><span>CRM</span>
+                    </a>
+                    <a href="/marketing" class="nav-item {% if active_page == 'marketing' %}active{% endif %}" id="nav-marketing">
+                        <span class="icon"><i class="fa-solid fa-bullhorn"></i></span><span>Marketing</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Finance</div>
+                    <a href="/invoices" class="nav-item {% if active_page == 'invoices' %}active{% endif %}" id="nav-invoices">
+                        <span class="icon"><i class="fa-solid fa-file-invoice-dollar"></i></span><span>Invoices</span>
+                    </a>
+                    <a href="/accounting" class="nav-item {% if active_page == 'accounting' %}active{% endif %}" id="nav-accounting">
+                        <span class="icon"><i class="fa-solid fa-book"></i></span><span>Accounting</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Operations</div>
+                    <a href="/assets" class="nav-item {% if active_page == 'assets' %}active{% endif %}" id="nav-assets">
+                        <span class="icon"><i class="fa-solid fa-boxes-stacked"></i></span><span>Assets</span>
+                    </a>
+                    <a href="/utilities" class="nav-item {% if active_page == 'utilities' %}active{% endif %}" id="nav-utilities">
+                        <span class="icon"><i class="fa-solid fa-bolt"></i></span><span>Utilities</span>
+                    </a>
+                    <a href="/maintenance" class="nav-item {% if active_page == 'maintenance' %}active{% endif %}" id="nav-maintenance">
+                        <span class="icon"><i class="fa-solid fa-screwdriver-wrench"></i></span><span>Maintenance</span>
+                    </a>
+                    <a href="/compliance" class="nav-item {% if active_page == 'compliance' %}active{% endif %}" id="nav-compliance">
+                        <span class="icon"><i class="fa-solid fa-shield-halved"></i></span><span>Compliance</span>
+                    </a>
+                    <a href="/workflow" class="nav-item {% if active_page == 'workflow' %}active{% endif %}" id="nav-workflow">
+                        <span class="icon"><i class="fa-solid fa-diagram-project"></i></span><span>Workflow</span>
+                    </a>
+                    <a href="/reports" class="nav-item {% if active_page == 'reports' %}active{% endif %}" id="nav-reports">
+                        <span class="icon"><i class="fa-solid fa-chart-pie"></i></span><span>Reports</span>
+                    </a>
+                </div>
+
+                {% if role.id == 1 %}
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <a href="/users" class="nav-item {% if active_page == 'users' %}active{% endif %}" id="nav-users">
+                        <span class="icon"><i class="fa-solid fa-user-gear"></i></span><span>Users</span>
+                    </a>
+                    <a href="/roles" class="nav-item {% if active_page == 'roles' %}active{% endif %}" id="nav-roles">
+                        <span class="icon"><i class="fa-solid fa-user-shield"></i></span><span>Roles</span>
+                    </a>
+                    <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}" id="nav-settings">
+                        <span class="icon"><i class="fa-solid fa-sliders"></i></span><span>Settings</span>
+                    </a>
+                    <a href="/execution-logs" class="nav-item">
+                        <span class="icon"><i class="fa-solid fa-list-check"></i></span><span>Execution Logs</span>
+                    </a>
+                    <a href="/workflow/scheduler" class="nav-item {% if active_page == 'scheduler' %}active{% endif %}" id="nav-scheduler">
+                        <span class="icon"><i class="fa-solid fa-clock"></i></span><span>Job Scheduler</span>
+                    </a>
+                </div>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="user-info" id="userMenuTrigger" type="button">
+                    <div class="user-avatar">{{ user.full_name[0] if user.full_name else 'U' }}</div>
+                    <div class="user-details">
+                        <div class="name">{{ user.full_name or user.username }}</div>
+                        <div class="role-badge">{{ role.role_name|title if role else 'User' }}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <div id="userMenu" class="user-menu-popup">
+                    <a href="/api/auth/logout" class="nav-item danger-item">
+                        <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span><span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="icon-btn mobile-toggle" id="menuToggle" type="button" title="Open navigation">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div>
+                        <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+                        <div class="topbar-subtitle">Operational control center</div>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" placeholder="Search this page" id="globalSearch">
+                    </div>
+                    <button class="icon-btn" id="themeSwitcher" type="button" title="Switch theme">
+                        <i class="fa-solid fa-palette"></i>
+                    </button>
+                    <button class="icon-btn" title="Notifications" type="button">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="badge" id="notifBadge" style="display:none">0</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="page-content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const themes = ['light-cloud', 'light-minimal', 'light-ocean', 'dark-midnight', 'dark-white', 'dark-slate', 'dark-oled'];
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icon = type === 'success' ? 'circle-check' : (type === 'error' ? 'triangle-exclamation' : 'circle-info');
+            toast.innerHTML = `<i class="fa-solid fa-${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4200);
+        }
+
+        async function apiFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+
+            const resp = await fetch(url, { ...options, headers });
+            if (resp.status === 401) {
+                window.location.href = '/login';
+                return null;
+            }
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || 'Request failed');
+            }
+
+            const contentType = resp.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                return resp.json();
+            }
+            return resp;
+        }
+
+        function formatCurrency(val, currency = 'USD') {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(val || 0));
+        }
+
+        function formatDate(d) {
+            if (!d) return '-';
+            const dt = new Date(d);
+            if (Number.isNaN(dt.getTime())) return '-';
+            return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function statusBadge(status) {
+            const map = {
+                'Active': 'success', 'Occupied': 'success', 'Paid': 'success', 'Completed': 'success',
+                'Vacant': 'danger', 'Overdue': 'danger', 'Cancelled': 'danger', 'Terminated': 'danger', 'Inactive': 'warning',
+                'Draft': 'neutral', 'New': 'info', 'Pending': 'warning', 'InProgress': 'info',
+                'Posted': 'purple', 'Reserved': 'warning', 'UnderMaintenance': 'info',
+                'PartiallyPaid': 'warning', 'Expired': 'neutral', 'Suspended': 'warning', 'Maintenance': 'warning',
+                'Disposed': 'danger', 'Billed': 'info'
+            };
+            return `<span class="badge badge-${map[status] || 'neutral'}">${status || '-'}</span>`;
+        }
+
+        (function initShell() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const menuToggle = document.getElementById('menuToggle');
+            const userMenu = document.getElementById('userMenu');
+            const userMenuTrigger = document.getElementById('userMenuTrigger');
+            const globalSearch = document.getElementById('globalSearch');
+            const themeSwitcher = document.getElementById('themeSwitcher');
+
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            }
+
+            menuToggle?.addEventListener('click', toggleSidebar);
+            overlay?.addEventListener('click', closeSidebar);
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 980) closeSidebar();
+            });
+
+            document.querySelectorAll('.sidebar .nav-item').forEach((link) => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 980) closeSidebar();
+                });
+            });
+
+            userMenuTrigger?.addEventListener('click', () => {
+                userMenu.classList.toggle('active');
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!userMenu?.contains(event.target) && !userMenuTrigger?.contains(event.target)) {
+                    userMenu?.classList.remove('active');
+                }
+            });
+
+            themeSwitcher?.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme') || themes[0];
+                const idx = themes.indexOf(current);
+                const next = themes[(idx + 1) % themes.length];
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('app-theme', next);
+                showToast(`Theme switched to ${next}`, 'success');
+            });
+
+            globalSearch?.addEventListener('input', () => {
+                const q = globalSearch.value.trim().toLowerCase();
+                const tables = document.querySelectorAll('table tbody');
+                tables.forEach((tbody) => {
+                    tbody.querySelectorAll('tr').forEach((row) => {
+                        if (!q) {
+                            row.style.display = '';
+                            return;
+                        }
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(q) ? '' : 'none';
+                    });
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === '/' && document.activeElement !== globalSearch) {
+                    const targetTag = document.activeElement?.tagName;
+                    if (targetTag !== 'INPUT' && targetTag !== 'TEXTAREA') {
+                        event.preventDefault();
+                        globalSearch?.focus();
+                    }
+                }
+            });
+        })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

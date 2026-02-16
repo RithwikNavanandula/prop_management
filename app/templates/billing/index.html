@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% set active_page = "invoices" %}
+{% block title %}Billing — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Invoices & Payments{% endblock %}
+
+{% block content %}
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('invoices',this)">Invoices</div>
+    <div class="tab" onclick="switchTab('payments',this)">Payments</div>
+</div>
+
+<div id="tabInvoices">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+        <select class="form-control" style="width:150px" id="invStatus" onchange="loadInvoices()">
+            <option value="">All</option>
+            <option>Draft</option>
+            <option>Posted</option>
+            <option>Paid</option>
+            <option>PartiallyPaid</option>
+            <option>Overdue</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModal('addInvModal')">+ New Invoice</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Type</th>
+                        <th>Tenant</th>
+                        <th>Date</th>
+                        <th>Due</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="invoicesTable">
+                    <tr>
+                        <td colspan="7">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="tabPayments" style="display:none">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+        <button class="btn btn-primary" onclick="openModal('addPmtModal')">+ Record Payment</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tenant</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentsTable">
+                    <tr>
+                        <td colspan="6">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal-backdrop" id="addInvModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Create Invoice</h3><button class="modal-close" onclick="closeModal('addInvModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="invForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Invoice #*</label><input class="form-control"
+                            name="invoice_number" required></div>
+                    <div class="form-group"><label class="form-label">Type</label><select class="form-control"
+                            name="invoice_type">
+                            <option>Rent</option>
+                            <option>Deposit</option>
+                            <option>Utilities</option>
+                            <option>CAM</option>
+                            <option>Maintenance</option>
+                        </select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Tenant*</label>
+                        <select class="form-control" name="tenant_id" id="invTenantSelect" required>
+                            <option value="">Select Tenant</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Property</label>
+                        <select class="form-control" name="property_id" id="invPropSelect">
+                            <option value="">Select Property</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Invoice Date*</label><input class="form-control"
+                            name="invoice_date" type="date" required></div>
+                    <div class="form-group"><label class="form-label">Due Date*</label><input class="form-control"
+                            name="due_date" type="date" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Amount*</label><input class="form-control"
+                            name="document_amount" type="number" step="0.01" required></div>
+                    <div class="form-group"><label class="form-label">Currency</label><input class="form-control"
+                            name="document_currency" value="USD"></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary"
+                onclick="closeModal('addInvModal')">Cancel</button><button class="btn btn-primary"
+                onclick="saveInvoice()">Create</button></div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-backdrop" id="addPmtModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Record Payment</h3><button class="modal-close" onclick="closeModal('addPmtModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="pmtForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Payment #*</label><input class="form-control"
+                            name="payment_number" required></div>
+                    <div class="form-group"><label class="form-label">Tenant*</label>
+                        <select class="form-control" name="tenant_id" id="pmtTenantSelect" required>
+                            <option value="">Select Tenant</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Date*</label><input class="form-control"
+                            name="payment_date" type="date" required></div>
+                    <div class="form-group"><label class="form-label">Amount*</label><input class="form-control"
+                            name="amount" type="number" step="0.01" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Method</label>
+                        <select class="form-control" name="payment_method">
+                            <option>Cash</option>
+                            <option>Bank Transfer</option>
+                            <option>Check</option>
+                            <option>Credit Card</option>
+                            <option>Online</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Reference</label><input class="form-control"
+                            name="reference_number"></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary"
+                onclick="closeModal('addPmtModal')">Cancel</button><button class="btn btn-primary"
+                onclick="savePayment()">Record</button></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let tenantMap = {};
+
+    function openModal(id) {
+        if (id === 'addInvModal' || id === 'addPmtModal') loadTenantDropdowns();
+        document.getElementById(id).classList.add('active');
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function switchTab(name, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); el.classList.add('active');
+        document.getElementById('tabInvoices').style.display = name === 'invoices' ? 'block' : 'none';
+        document.getElementById('tabPayments').style.display = name === 'payments' ? 'block' : 'none';
+        if (name === 'payments') loadPayments();
+    }
+
+    async function loadTenantDropdowns() {
+        if (Object.keys(tenantMap).length) return; // already loaded
+        try {
+            const data = await apiFetch('/api/tenants?limit=200');
+            const tenants = data.items || [];
+            tenants.forEach(t => {
+                tenantMap[t.id] = `${t.first_name} ${t.last_name || ''}`.trim();
+            });
+            const opts = tenants.map(t => `<option value="${t.id}">${tenantMap[t.id]}</option>`).join('');
+            document.getElementById('invTenantSelect').innerHTML = '<option value="">Select Tenant</option>' + opts;
+            document.getElementById('pmtTenantSelect').innerHTML = '<option value="">Select Tenant</option>' + opts;
+
+            // Load properties too
+            const propData = await apiFetch('/api/properties?limit=200');
+            document.getElementById('invPropSelect').innerHTML = '<option value="">Select Property</option>' +
+                (propData.items || []).map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
+        } catch (e) { console.error(e); }
+    }
+
+    function getTenantName(id) {
+        return tenantMap[id] || `Tenant #${id}`;
+    }
+
+    async function loadTenantsForLookup() {
+        if (Object.keys(tenantMap).length) return;
+        try {
+            const data = await apiFetch('/api/tenants?limit=200');
+            (data.items || []).forEach(t => {
+                tenantMap[t.id] = `${t.first_name} ${t.last_name || ''}`.trim();
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    async function loadInvoices() {
+        await loadTenantsForLookup();
+        const st = document.getElementById('invStatus').value;
+        let url = '/api/billing/invoices?limit=100'; if (st) url += `&status=${st}`;
+        try {
+            const data = await apiFetch(url);
+            const tb = document.getElementById('invoicesTable');
+            if (!data.items || !data.items.length) { tb.innerHTML = '<tr><td colspan="7" class="empty-state">No invoices</td></tr>'; return; }
+            tb.innerHTML = data.items.map(i => `<tr>
+                <td><strong>${i.invoice_number}</strong></td>
+                <td>${i.invoice_type || '-'}</td>
+                <td>${getTenantName(i.tenant_id)}</td>
+                <td>${formatDate(i.invoice_date)}</td>
+                <td>${formatDate(i.due_date)}</td>
+                <td>${formatCurrency(i.total_amount || i.document_amount, i.document_currency || 'USD')}</td>
+                <td>${statusBadge(i.invoice_status || i.status || 'Draft')}</td>
+            </tr>`).join('');
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadPayments() {
+        await loadTenantsForLookup();
+        try {
+            const data = await apiFetch('/api/billing/payments?limit=100');
+            const tb = document.getElementById('paymentsTable');
+            if (!data.items || !data.items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-state">No payments</td></tr>'; return; }
+            tb.innerHTML = data.items.map(p => `<tr>
+                <td><strong>${p.payment_number}</strong></td>
+                <td>${getTenantName(p.tenant_id)}</td>
+                <td>${formatDate(p.payment_date)}</td>
+                <td>${formatCurrency(p.amount, p.currency || 'USD')}</td>
+                <td>${p.payment_method || p.payment_method_id || '-'}</td>
+                <td>${statusBadge(p.status || 'Completed')}</td>
+            </tr>`).join('');
+        } catch (e) { console.error(e); }
+    }
+
+    async function saveInvoice() {
+        const d = {}; new FormData(document.getElementById('invForm')).forEach((v, k) => { d[k] = v });
+        d.tenant_id = parseInt(d.tenant_id); d.property_id = parseInt(d.property_id) || null;
+        d.document_amount = parseFloat(d.document_amount); d.total_amount = d.document_amount;
+        try {
+            await apiFetch('/api/billing/invoices', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('addInvModal'); showToast('Invoice created'); loadInvoices();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function savePayment() {
+        const d = {}; new FormData(document.getElementById('pmtForm')).forEach((v, k) => { d[k] = v });
+        d.tenant_id = parseInt(d.tenant_id); d.amount = parseFloat(d.amount);
+        try {
+            await apiFetch('/api/billing/payments', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('addPmtModal'); showToast('Payment recorded'); loadPayments();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    loadInvoices();
+</script>
+{% endblock %}

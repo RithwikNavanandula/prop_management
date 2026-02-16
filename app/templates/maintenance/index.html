@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set active_page = "maintenance" %}
+{% block title %}Maintenance — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Maintenance & Work Orders{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;margin-bottom:24px">
+    <div style="display:flex;gap:12px">
+        <select class="form-control" style="width:140px" id="statusFilter" onchange="loadRequests()">
+            <option value="">All Status</option>
+            <option>New</option>
+            <option>InProgress</option>
+            <option>Completed</option>
+            <option>Cancelled</option>
+        </select>
+        <select class="form-control" style="width:140px" id="priorityFilter" onchange="loadRequests()">
+            <option value="">All Priority</option>
+            <option>P1</option>
+            <option>P2</option>
+            <option>P3</option>
+            <option>P4</option>
+            <option>P5</option>
+        </select>
+    </div>
+    <button class="btn btn-primary" onclick="openModal('addReqModal')">+ New Request</button>
+</div>
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Req #</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Property</th>
+                    <th>Reported</th>
+                    <th>Status</th>
+                    <th>SLA</th>
+                </tr>
+            </thead>
+            <tbody id="reqTable">
+                <tr>
+                    <td colspan="7">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addReqModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>New Maintenance Request</h3><button class="modal-close" onclick="closeModal('addReqModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="reqForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Request #*</label><input class="form-control"
+                            name="request_number" required></div>
+                    <div class="form-group"><label class="form-label">Property ID*</label><input class="form-control"
+                            name="property_id" type="number" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Category</label><select class="form-control"
+                            name="category">
+                            <option>Plumbing</option>
+                            <option>Electrical</option>
+                            <option>HVAC</option>
+                            <option>Cleaning</option>
+                            <option>Structural</option>
+                            <option>IT</option>
+                            <option>General</option>
+                        </select></div>
+                    <div class="form-group"><label class="form-label">Priority</label><select class="form-control"
+                            name="priority">
+                            <option>P1</option>
+                            <option>P2</option>
+                            <option selected>P3</option>
+                            <option>P4</option>
+                            <option>P5</option>
+                        </select></div>
+                </div>
+                <div class="form-group"><label class="form-label">Description*</label><textarea class="form-control"
+                        name="description" required></textarea></div>
+                <div class="form-group"><label class="form-label">Reported By</label><input class="form-control"
+                        name="reported_by"></div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary"
+                onclick="closeModal('addReqModal')">Cancel</button><button class="btn btn-primary"
+                onclick="saveRequest()">Submit</button></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openModal(id) { document.getElementById(id).classList.add('active') }
+    function closeModal(id) { document.getElementById(id).classList.remove('active') }
+
+    async function loadRequests() {
+        const st = document.getElementById('statusFilter').value;
+        const pr = document.getElementById('priorityFilter').value;
+        let url = '/api/maintenance/requests?limit=100';
+        if (st) url += `&status=${st}`; if (pr) url += `&priority=${pr}`;
+        const data = await apiFetch(url);
+        const tb = document.getElementById('reqTable');
+        if (!data.items.length) { tb.innerHTML = '<tr><td colspan="7" class="empty-state"><p>No requests</p></td></tr>'; return; }
+        tb.innerHTML = data.items.map(r => `<tr>
+        <td><strong>${r.request_number}</strong></td><td>${r.category}</td>
+        <td><span class="badge badge-${r.priority === 'P1' ? 'danger' : r.priority === 'P2' ? 'warning' : 'info'}">${r.priority}</span></td>
+        <td>${r.property_id}</td><td>${formatDate(r.reported_at)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td>${r.sla_resolution_breached ? '<span class="badge badge-danger">Breached</span>' : '<span class="badge badge-success">OK</span>'}</td>
+    </tr>`).join('');
+    }
+
+    async function saveRequest() {
+        const d = {}; new FormData(document.getElementById('reqForm')).forEach((v, k) => { d[k] = v });
+        d.property_id = parseInt(d.property_id);
+        await apiFetch('/api/maintenance/requests', { method: 'POST', body: JSON.stringify(d) });
+        closeModal('addReqModal'); showToast('Request submitted'); loadRequests();
+    }
+
+    loadRequests();
+</script>
+{% endblock %}

@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% set active_page = "assets" %}
+{% block title %}Asset Manager — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Asset Manager{% endblock %}
+
+{% block content %}
+<div class="stats-grid" id="assetStats">
+    <div class="stat-card purple">
+        <div class="stat-icon">📦</div>
+        <div class="stat-value" id="totalCount">0</div>
+        <div class="stat-label">Total Assets</div>
+    </div>
+    <div class="stat-card teal">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" id="activeCount">0</div>
+        <div class="stat-label">Active</div>
+    </div>
+    <div class="stat-card pink">
+        <div class="stat-icon">⏸️</div>
+        <div class="stat-value" id="inactiveCount">0</div>
+        <div class="stat-label">Inactive</div>
+    </div>
+    <div class="stat-card gold">
+        <div class="stat-icon">📌</div>
+        <div class="stat-value" id="allocatedCount">0</div>
+        <div class="stat-label">Allocated</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <input type="text" class="form-control" id="searchBox" placeholder="Search assets..." style="width:220px"
+                oninput="debounceSearch()">
+            <select class="form-control" id="statusFilter" style="width:140px" onchange="loadAssets()">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Disposed">Disposed</option>
+            </select>
+            <select class="form-control" id="allocFilter" style="width:160px" onchange="loadAssets()">
+                <option value="">All Allocation</option>
+                <option value="true">Allocated</option>
+                <option value="false">Unallocated</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Asset</button>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset #</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Condition</th>
+                    <th>Allocation</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="assetsTable">
+                <tr>
+                    <td colspan="8">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Asset Modal -->
+<div class="modal-backdrop" id="assetModal">
+    <div class="modal" style="max-width:650px">
+        <div class="modal-header">
+            <h3 id="assetModalTitle">Add Asset</h3><button class="modal-close"
+                onclick="closeModal('assetModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="assetForm">
+                <input type="hidden" name="id" id="assetId">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Asset Number</label><input class="form-control"
+                            name="asset_number" placeholder="Auto-generated if blank"></div>
+                    <div class="form-group"><label class="form-label">Asset Name*</label><input class="form-control"
+                            name="asset_name" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Category</label>
+                        <select class="form-control" name="asset_category">
+                            <option>Furniture</option>
+                            <option>Appliance</option>
+                            <option>Fixture</option>
+                            <option>Electronics</option>
+                            <option>HVAC</option>
+                            <option>Plumbing</option>
+                            <option>Safety</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Type</label><input class="form-control"
+                            name="asset_type" placeholder="e.g. Sofa, AC Unit"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Serial Number</label><input class="form-control"
+                            name="serial_number"></div>
+                    <div class="form-group"><label class="form-label">Manufacturer</label><input class="form-control"
+                            name="manufacturer"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Model</label><input class="form-control"
+                            name="model"></div>
+                    <div class="form-group"><label class="form-label">Condition</label>
+                        <select class="form-control" name="condition_status">
+                            <option>New</option>
+                            <option>Good</option>
+                            <option>Fair</option>
+                            <option>NeedsRepair</option>
+                            <option>EndOfLife</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Purchase Date</label><input class="form-control"
+                            name="purchase_date" type="date"></div>
+                    <div class="form-group"><label class="form-label">Purchase Price</label><input class="form-control"
+                            name="purchase_price" type="number" step="0.01"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Warranty Expiry</label><input class="form-control"
+                            name="warranty_expiry_date" type="date"></div>
+                    <div class="form-group"><label class="form-label">Status</label>
+                        <select class="form-control" name="status" id="assetStatusSelect">
+                            <option>Active</option>
+                            <option>Inactive</option>
+                            <option>Maintenance</option>
+                            <option>Disposed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-control"
+                        name="description" rows="2"></textarea></div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('assetModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveAsset()">Save Asset</button>
+        </div>
+    </div>
+</div>
+
+<!-- Allocate Modal -->
+<div class="modal-backdrop" id="allocateModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Allocate Asset</h3><button class="modal-close" onclick="closeModal('allocateModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="allocAssetId">
+            <p style="margin-bottom:12px;color:var(--text-secondary)">Assign <strong id="allocAssetName"></strong> to a
+                property and unit.</p>
+            <div class="form-group">
+                <label class="form-label">Property</label>
+                <select class="form-control" id="allocPropertySelect" onchange="loadPropertyUnits()">
+                    <option value="">Select Property</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Unit</label>
+                <select class="form-control" id="allocUnitSelect">
+                    <option value="">Select Unit</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('allocateModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmAllocate()">Allocate</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allAssets = [];
+    let searchTimer;
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(loadAssets, 300); }
+
+    function openAddModal() {
+        document.getElementById('assetForm').reset();
+        document.getElementById('assetId').value = '';
+        document.getElementById('assetModalTitle').textContent = 'Add Asset';
+        document.getElementById('assetStatusSelect').value = 'Active';
+        openModal('assetModal');
+    }
+
+    async function openEditModal(id) {
+        const asset = allAssets.find(a => a.id === id);
+        if (!asset) return;
+        document.getElementById('assetModalTitle').textContent = 'Edit Asset';
+        document.getElementById('assetId').value = asset.id;
+        const form = document.getElementById('assetForm');
+        form.querySelector('[name="asset_number"]').value = asset.asset_number || '';
+        form.querySelector('[name="asset_name"]').value = asset.asset_name || '';
+        form.querySelector('[name="asset_category"]').value = asset.asset_category || 'Furniture';
+        form.querySelector('[name="asset_type"]').value = asset.asset_type || '';
+        form.querySelector('[name="serial_number"]').value = asset.serial_number || '';
+        form.querySelector('[name="manufacturer"]').value = asset.manufacturer || '';
+        form.querySelector('[name="model"]').value = asset.model || '';
+        form.querySelector('[name="condition_status"]').value = asset.condition_status || 'Good';
+        form.querySelector('[name="purchase_date"]').value = asset.purchase_date ? asset.purchase_date.slice(0, 10) : '';
+        form.querySelector('[name="purchase_price"]').value = asset.purchase_price || '';
+        form.querySelector('[name="warranty_expiry_date"]').value = asset.warranty_expiry_date ? asset.warranty_expiry_date.slice(0, 10) : '';
+        form.querySelector('[name="status"]').value = asset.status || 'Active';
+        form.querySelector('[name="description"]').value = asset.description || '';
+        openModal('assetModal');
+    }
+
+    async function loadAssets() {
+        const search = document.getElementById('searchBox').value;
+        const status = document.getElementById('statusFilter').value;
+        const alloc = document.getElementById('allocFilter').value;
+        let url = '/api/assets?';
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+        if (status) url += `status=${status}&`;
+        if (alloc) url += `allocated=${alloc}&`;
+        try {
+            const data = await apiFetch(url);
+            allAssets = data.items || [];
+            renderTable(allAssets);
+            updateStats(allAssets);
+        } catch (e) {
+            document.getElementById('assetsTable').innerHTML = '<tr><td colspan="8">Error loading assets</td></tr>';
+        }
+    }
+
+    function updateStats(items) {
+        // Fetch all assets (unfiltered) for accurate stats
+        apiFetch('/api/assets').then(data => {
+            const all = data.items || [];
+            document.getElementById('totalCount').textContent = all.length;
+            document.getElementById('activeCount').textContent = all.filter(a => a.status === 'Active').length;
+            document.getElementById('inactiveCount').textContent = all.filter(a => a.status !== 'Active').length;
+            document.getElementById('allocatedCount').textContent = all.filter(a => a.is_allocated).length;
+        }).catch(() => { });
+    }
+
+    function renderTable(items) {
+        const tbody = document.getElementById('assetsTable');
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><p>No assets found</p></td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(a => `<tr>
+            <td><strong>${a.asset_number || '-'}</strong></td>
+            <td>${a.asset_name}</td>
+            <td>${a.asset_category || '-'}</td>
+            <td>${a.asset_type || '-'}</td>
+            <td><span class="badge ${a.condition_status === 'New' || a.condition_status === 'Good' ? 'badge-success' : a.condition_status === 'Fair' ? 'badge-info' : 'badge-warning'}">${a.condition_status || '-'}</span></td>
+            <td>${a.is_allocated
+                ? '<span class="badge badge-info">Allocated</span>'
+                : '<span class="badge badge-warning">Unallocated</span>'}</td>
+            <td>${statusBadge(a.status || 'Active')}</td>
+            <td style="white-space:nowrap">
+                <button class="btn btn-sm btn-secondary" onclick="openEditModal(${a.id})" title="Edit">✏️</button>
+                ${a.status === 'Active'
+                ? `<button class="btn btn-sm btn-secondary" onclick="toggleStatus(${a.id},'Inactive')" title="Deactivate">⏸️</button>`
+                : `<button class="btn btn-sm btn-secondary" onclick="toggleStatus(${a.id},'Active')" title="Activate">▶️</button>`}
+                ${!a.is_allocated
+                ? `<button class="btn btn-sm btn-primary" onclick="openAllocateModal(${a.id})" title="Allocate">📌</button>`
+                : `<button class="btn btn-sm btn-secondary" onclick="unallocateAsset(${a.id})" title="Unallocate">🔓</button>`}
+                <button class="btn btn-sm btn-danger" onclick="deleteAsset(${a.id})" title="Delete">🗑️</button>
+            </td>
+        </tr>`).join('');
+    }
+
+    async function saveAsset() {
+        const form = document.getElementById('assetForm');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((v, k) => {
+            if (k === 'id' && !v) return;
+            if (v === '' && ['purchase_price', 'purchase_date', 'warranty_expiry_date', 'description', 'serial_number', 'manufacturer', 'model', 'asset_number'].includes(k)) return;
+            if (k === 'purchase_price') { data[k] = parseFloat(v) || null; return; }
+            data[k] = v;
+        });
+        try {
+            const id = document.getElementById('assetId').value;
+            if (id) {
+                await apiFetch(`/api/assets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+                showToast('Asset updated');
+            } else {
+                await apiFetch('/api/assets', { method: 'POST', body: JSON.stringify(data) });
+                showToast('Asset created');
+            }
+            closeModal('assetModal');
+            loadAssets();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function toggleStatus(id, newStatus) {
+        try {
+            await apiFetch(`/api/assets/${id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+            showToast(`Asset ${newStatus === 'Active' ? 'activated' : 'deactivated'}`);
+            loadAssets();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteAsset(id) {
+        if (!confirm('Permanently delete this asset?')) return;
+        try {
+            await apiFetch(`/api/assets/${id}`, { method: 'DELETE' });
+            showToast('Asset deleted');
+            loadAssets();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function openAllocateModal(id) {
+        const asset = allAssets.find(a => a.id === id);
+        if (!asset) return;
+        document.getElementById('allocAssetId').value = id;
+        document.getElementById('allocAssetName').textContent = `${asset.asset_number} — ${asset.asset_name}`;
+        document.getElementById('allocUnitSelect').innerHTML = '<option value="">Select Unit</option>';
+        // Load properties
+        try {
+            const data = await apiFetch('/api/properties?limit=200');
+            document.getElementById('allocPropertySelect').innerHTML = '<option value="">Select Property</option>' +
+                (data.items || []).map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
+        } catch (e) { /* ignore */ }
+        openModal('allocateModal');
+    }
+
+    async function loadPropertyUnits() {
+        const propId = document.getElementById('allocPropertySelect').value;
+        const unitSel = document.getElementById('allocUnitSelect');
+        if (!propId) { unitSel.innerHTML = '<option value="">Select Unit</option>'; return; }
+        try {
+            const data = await apiFetch(`/api/properties/${propId}/units`);
+            unitSel.innerHTML = '<option value="">Select Unit</option>' +
+                (data.items || []).map(u => `<option value="${u.id}">${u.unit_number} — ${u.unit_name || u.unit_type || ''}</option>`).join('');
+        } catch (e) { unitSel.innerHTML = '<option value="">Error loading units</option>'; }
+    }
+
+    async function confirmAllocate() {
+        const assetId = document.getElementById('allocAssetId').value;
+        const propId = document.getElementById('allocPropertySelect').value;
+        const unitId = document.getElementById('allocUnitSelect').value;
+        if (!unitId) { showToast('Please select a unit', 'error'); return; }
+        try {
+            await apiFetch(`/api/assets/${assetId}/allocate`, {
+                method: 'POST',
+                body: JSON.stringify({ unit_id: parseInt(unitId), property_id: parseInt(propId) || null })
+            });
+            closeModal('allocateModal');
+            showToast('Asset allocated successfully');
+            loadAssets();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function unallocateAsset(id) {
+        if (!confirm('Remove this asset from its unit?')) return;
+        try {
+            await apiFetch(`/api/assets/${id}/unallocate`, { method: 'POST' });
+            showToast('Asset unallocated');
+            loadAssets();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    loadAssets();
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% set active_page = "tenants" %}
+{% block title %}Tenants — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Tenant Management{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;margin-bottom:24px">
+    <input type="text" class="form-control" style="width:260px" placeholder="Search tenants..." id="searchInput"
+        oninput="loadTenants()">
+    <button class="btn btn-primary" onclick="openModal('addTenantModal')">+ Add Tenant</button>
+</div>
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tenantsTable">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addTenantModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Tenant</h3><button class="modal-close" onclick="closeModal('addTenantModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="tenantForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Tenant Code*</label><input class="form-control"
+                            name="tenant_code" required></div>
+                    <div class="form-group"><label class="form-label">Type</label><select class="form-control"
+                            name="tenant_type">
+                            <option>Individual</option>
+                            <option>Corporate</option>
+                        </select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">First Name*</label><input class="form-control"
+                            name="first_name" required></div>
+                    <div class="form-group"><label class="form-label">Last Name</label><input class="form-control"
+                            name="last_name"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Email</label><input class="form-control"
+                            name="email" type="email"></div>
+                    <div class="form-group"><label class="form-label">Phone</label><input class="form-control"
+                            name="phone"></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary"
+                onclick="closeModal('addTenantModal')">Cancel</button><button class="btn btn-primary"
+                onclick="saveTenant()">Save</button></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openModal(id) { document.getElementById(id).classList.add('active') }
+    function closeModal(id) { document.getElementById(id).classList.remove('active') }
+
+    async function loadTenants() {
+        const q = document.getElementById('searchInput').value;
+        let url = '/api/tenants?limit=100'; if (q) url += `&search=${encodeURIComponent(q)}`;
+        const data = await apiFetch(url);
+        const tb = document.getElementById('tenantsTable');
+        if (!data.items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No tenants</p></td></tr>'; return; }
+        tb.innerHTML = data.items.map(t => `<tr>
+        <td><strong>${t.tenant_code}</strong></td><td>${t.first_name || ''} ${t.last_name || ''}</td>
+        <td>${t.tenant_type}</td><td>${t.email || '-'}</td><td>${t.phone || '-'}</td><td>${statusBadge(t.status)}</td></tr>`).join('');
+    }
+
+    async function saveTenant() {
+        const d = {}; new FormData(document.getElementById('tenantForm')).forEach((v, k) => { d[k] = v });
+        await apiFetch('/api/tenants', { method: 'POST', body: JSON.stringify(d) });
+        closeModal('addTenantModal'); showToast('Tenant added'); loadTenants();
+    }
+
+    loadTenants();
+</script>
+{% endblock %}

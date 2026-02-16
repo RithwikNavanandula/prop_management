@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+{% set active_page = "properties" %}
+{% block title %}Unit Detail — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Unit Detail{% endblock %}
+
+{% block content %}
+<div class="breadcrumb" style="margin-bottom:20px">
+    <a href="/properties">Properties</a> <span>/</span>
+    <a href="/properties/{{ prop_id }}" id="propLink">Property</a> <span>/</span>
+    Unit <span id="unitNumDisplay">...</span>
+</div>
+
+<!-- Data bridge for scripts to avoid JS lints -->
+<div id="unit-data-bridge" data-prop-id="{{ prop_id }}" data-unit-id="{{ unit_id }}" style="display:none"></div>
+
+<div class="stats-grid" id="unitStats"></div>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('assets',this)">Assets</div>
+    <div class="tab" onclick="switchTab('leases',this)">Leases</div>
+    <div class="tab" onclick="switchTab('maintenance',this)">Maintenance</div>
+    <div class="tab" onclick="switchTab('details',this)">Details</div>
+</div>
+
+<div id="tabAssets" class="card">
+    <div class="card-header">
+        <h3>Unit Assets</h3>
+        <button class="btn btn-sm btn-primary" onclick="openAllocateModal()">📌 Allocate Asset</button>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset Name</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Serial #</th>
+                    <th>Condition</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="assetsTable">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="tabLeases" class="card" style="display:none">
+    <div class="card-header">
+        <h3>Active Lease</h3>
+        <button class="btn btn-sm btn-primary" onclick="openLeaseModal()">+ Create New Lease</button>
+    </div>
+    <div id="leaseInfo" style="padding:16px">
+        <div id="activeLeaseCard" style="display:none">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px">
+                <div>
+                    <h4 id="leaseNumDetail" style="margin-bottom:4px">Lease #...</h4>
+                    <p id="leaseDates" style="color:var(--text-secondary); font-size:13px">... to ...</p>
+                </div>
+                <div id="leaseStatusBadge"></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom:24px">
+                <div class="stat-card" style="padding:12px">
+                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase">Monthly Rent</div>
+                    <div id="leaseRent" style="font-size:18px; font-weight:700">...</div>
+                </div>
+                <div class="stat-card" style="padding:12px">
+                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase">Frequency</div>
+                    <div id="leaseFreq" style="font-size:18px; font-weight:700">...</div>
+                </div>
+                <div class="stat-card" style="padding:12px">
+                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase">Tenant ID</div>
+                    <div id="leaseTenant" style="font-size:18px; font-weight:700">...</div>
+                </div>
+            </div>
+
+            <h5>Rent Schedule</h5>
+            <div class="table-container" style="margin-top:10px">
+                <table style="font-size:13px">
+                    <thead>
+                        <tr>
+                            <th>Due Date</th>
+                            <th>Period</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rentScheduleTable">
+                        <tr>
+                            <td colspan="4">Loading schedule...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="noLeaseMessage" class="empty-state">
+            <p>No active lease found.</p>
+        </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border); padding-top:16px">
+        <div class="card-header">
+            <h3>Documents (Leases/Contracts)</h3>
+            <button class="btn btn-sm btn-secondary" onclick="openModal('uploadDocModal')">📤 Upload Document</button>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Type</th>
+                        <th>Upload Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="documentsTable">
+                    <tr>
+                        <td colspan="4">Loading documents...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="tabMaintenance" class="card" style="display:none">
+    <div class="card-header">
+        <h3>Maintenance History</h3>
+    </div>
+    <div id="maintenanceInfo" style="padding:16px">
+        <p class="empty-state">No maintenance records found.</p>
+    </div>
+</div>
+
+<div id="tabDetails" class="card" style="display:none">
+    <div class="card-header">
+        <h3>Technical Details</h3>
+    </div>
+    <div id="unitDetails" style="padding:16px"></div>
+</div>
+
+<!-- Add Asset Modal -->
+<div class="modal-backdrop" id="addAssetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Unit Asset</h3><button class="modal-close" onclick="closeModal('addAssetModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="assetForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Asset Name*</label><input class="form-control"
+                            name="asset_name" required></div>
+                    <div class="form-group"><label class="form-label">Category</label>
+                        <select class="form-control" name="asset_category">
+                            <option>Furniture</option>
+                            <option>Appliance</option>
+                            <option>Fixture</option>
+                            <option>Electronics</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Type</label><input class="form-control"
+                            name="asset_type" placeholder="e.g. Sofa, Fridge"></div>
+                    <div class="form-group"><label class="form-label">Serial Number</label><input class="form-control"
+                            name="serial_number"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Manufacturer</label><input class="form-control"
+                            name="manufacturer"></div>
+                    <div class="form-group"><label class="form-label">Model</label><input class="form-control"
+                            name="model"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Condition</label>
+                        <select class="form-control" name="condition_status">
+                            <option>New</option>
+                            <option>Good</option>
+                            <option>NeedsRepair</option>
+                            <option>EndOfLife</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addAssetModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveAsset()">Save Asset</button>
+        </div>
+    </div>
+</div>
+
+<!-- Allocate Asset Modal -->
+<div class="modal-backdrop" id="allocateAssetModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Allocate Existing Asset</h3><button class="modal-close"
+                onclick="closeModal('allocateAssetModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom:12px; font-size:14px; color:var(--text-secondary)">
+                Select an unallocated asset to assign to this unit.
+            </p>
+            <div class="form-group">
+                <label class="form-label">Search / Select Asset</label>
+                <select class="form-control" id="unallocatedAssetSelect">
+                    <option value="">Loading assets...</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('allocateAssetModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmAllocation()">Allocate to Unit</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Lease Modal (Embedded from Leases page) -->
+<div class="modal-backdrop" id="addLeaseModal">
+    <div class="modal" style="max-width:850px">
+        <div class="modal-header">
+            <h3>Create New Lease</h3><button class="modal-close" onclick="closeModal('addLeaseModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="leaseForm">
+                <input type="hidden" name="property_id" value="{{ prop_id }}">
+                <input type="hidden" name="unit_id" value="{{ unit_id }}">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Column 1: Core Details -->
+                    <div>
+                        <h4 style="margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:4px">
+                            Basic
+                            Information</h4>
+                        <div class="form-group"><label class="form-label">Lease Number*</label>
+                            <input class="form-control" name="lease_number" required placeholder="e.g. L-1001">
+                        </div>
+
+
+                        <div class="form-group"><label class="form-label">Tenant*</label>
+                            <select class="form-control" name="tenant_id" id="leaseTenantSelect" required>
+                                <option value="">Select Tenant</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Lease Type</label>
+                                <select class="form-control" name="lease_type">
+                                    <option>Residential</option>
+                                    <option>Commercial</option>
+                                    <option>License</option>
+                                    <option>ShortTerm</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Notice Period (Days)</label>
+                                <input class="form-control" name="notice_period_days" type="number" value="30">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Start Date*</label><input
+                                    class="form-control" name="start_date" type="date" required></div>
+                            <div class="form-group"><label class="form-label">End Date*</label><input
+                                    class="form-control" name="end_date" type="date" required></div>
+                        </div>
+                        <div class="form-group"><label class="form-label">Possession Date</label><input
+                                class="form-control" name="possession_date" type="date"></div>
+                    </div>
+
+                    <!-- Column 2: Financials & Rules -->
+                    <div>
+                        <h4 style="margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:4px">
+                            Financials & Terms</h4>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Rent Amount*</label>
+                                <input class="form-control" name="base_rent_amount" type="number" step="0.01" required>
+                            </div>
+                            <div class="form-group"><label class="form-label">Currency</label>
+                                <input class="form-control" name="base_rent_currency" value="USD">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Rent Frequency</label>
+                                <select class="form-control" name="rent_frequency">
+                                    <option>Monthly</option>
+                                    <option>Quarterly</option>
+                                    <option>Yearly</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Rent Type</label>
+                                <select class="form-control" name="rent_type">
+                                    <option>Fixed</option>
+                                    <option>Variable</option>
+                                    <option>RevenueShare</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Service Charge %</label>
+                                <input class="form-control" name="service_charge_percent" type="number" step="0.01">
+                            </div>
+                            <div class="form-group"><label class="form-label">Discounts</label>
+                                <input class="form-control" name="discounts" type="number" step="0.01" value="0">
+                            </div>
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Cam Charge Basis</label>
+                            <input class="form-control" name="cam_charge_basis" placeholder="e.g. Sqft, Fixed">
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Payment Terms</label>
+                            <input class="form-control" name="payment_terms" placeholder="e.g. Due on 1st">
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addLeaseModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveLease()">Create Lease</button>
+        </div>
+    </div>
+
+    <!-- Upload Document Modal -->
+    <div class="modal-backdrop" id="uploadDocModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Upload Unit Document</h3><button class="modal-close"
+                    onclick="closeModal('uploadDocModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label class="form-label">Select File (Lease/Contract)*</label>
+                        <input type="file" class="form-control" name="file" id="docFile" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('uploadDocModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="uploadDocument()">Upload Now</button>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    <script>
+        const bridge = document.getElementById('unit-data-bridge').dataset;
+        const propId = parseInt(bridge.propId);
+        const unitId = parseInt(bridge.unitId);
+
+        function openModal(id) { document.getElementById(id).classList.add('active') }
+        function closeModal(id) { document.getElementById(id).classList.remove('active') }
+        function switchTab(name, el) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); el.classList.add('active');
+            ['assets', 'leases', 'maintenance', 'details'].forEach(t => {
+                const el = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (el) el.style.display = t === name ? 'block' : 'none';
+            });
+        }
+
+        async function loadUnit() {
+            const unit = await apiFetch(`/api/properties/${propId}/units/${unitId}`);
+            if (!unit) { showToast('Unit not found', 'error'); return; }
+
+            const p = await apiFetch(`/api/properties/${propId}`);
+            document.getElementById('propLink').textContent = p.property_name;
+            document.getElementById('unitNumDisplay').textContent = unit.unit_number;
+
+            document.getElementById('unitStats').innerHTML = `
+            <div class="stat-card purple"><div class="stat-icon">🏠</div><div class="stat-value">${unit.unit_number}</div><div class="stat-label">${unit.unit_type}</div></div>
+            <div class="stat-card teal"><div class="stat-icon">📐</div><div class="stat-value">${unit.area_sqft || '-'}</div><div class="stat-label">Area (sqft)</div></div>
+            <div class="stat-card pink"><div class="stat-icon">💵</div><div class="stat-value">${formatCurrency(unit.market_rent)}</div><div class="stat-label">Market Rent</div></div>
+            <div class="stat-card gold"><div class="stat-icon">🚦</div><div class="stat-value">${unit.current_status}</div><div class="stat-label">Status</div></div>
+        `;
+
+            document.getElementById('unitDetails').innerHTML = `<pre style="color:var(--text-secondary);font-size:13px;white-space:pre-wrap">${JSON.stringify(unit, null, 2)}</pre>`;
+            loadAssets();
+            loadDocuments();
+            loadActiveLease();
+        }
+
+        async function loadActiveLease() {
+            try {
+                // Find active lease for this unit
+                const leases = await apiFetch(`/api/leases?unit_id=${unitId}&status=Active`);
+                if (!leases.items || !leases.items.length) {
+                    document.getElementById('noLeaseMessage').style.display = 'block';
+                    document.getElementById('activeLeaseCard').style.display = 'none';
+                    return;
+                }
+
+                // Get full details including schedule
+                const l = await apiFetch(`/api/leases/${leases.items[0].id}`);
+                document.getElementById('noLeaseMessage').style.display = 'none';
+                document.getElementById('activeLeaseCard').style.display = 'block';
+
+                document.getElementById('leaseNumDetail').textContent = `Lease #${l.lease_number}`;
+                document.getElementById('leaseDates').textContent = `${formatDate(l.start_date)} to ${formatDate(l.end_date)}`;
+                document.getElementById('leaseStatusBadge').innerHTML = statusBadge(l.lease_status);
+                document.getElementById('leaseRent').textContent = formatCurrency(l.base_rent_amount, l.base_rent_currency);
+                document.getElementById('leaseFreq').textContent = l.rent_frequency || 'Monthly';
+                document.getElementById('leaseTenant').textContent = `#${l.tenant_id}`;
+
+                const sched = l.rent_schedules || [];
+                document.getElementById('rentScheduleTable').innerHTML = sched.map(s => `
+                <tr>
+                    <td><strong>${formatDate(s.due_date)}</strong></td>
+                    <td><small>${formatDate(s.period_start)} - ${formatDate(s.period_end)}</small></td>
+                    <td>${formatCurrency(s.total_amount || s.scheduled_amount, s.currency)}</td>
+                    <td>${s.is_paid ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">Unpaid</span>'}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="empty-state">No schedule items</td></tr>';
+
+            } catch (e) {
+                console.error('Error loading lease:', e);
+                document.getElementById('noLeaseMessage').innerHTML = '<p style="color:var(--danger)">Error loading lease details</p>';
+            }
+        }
+
+        async function openLeaseModal() {
+            openModal('addLeaseModal');
+            // Load Tenants for selection
+            const tenants = await apiFetch('/api/tenants?limit=100');
+            const tSelect = document.getElementById('leaseTenantSelect');
+            tSelect.innerHTML = '<option value="">Select Tenant</option>' +
+                tenants.items.map(t => `<option value="${t.id}">${t.first_name} ${t.last_name || ''}</option>`).join('');
+
+        }
+
+        async function saveLease() {
+            const d = {}; new FormData(document.getElementById('leaseForm')).forEach((v, k) => { d[k] = v });
+
+            // Convert and validate IDs
+            d.property_id = parseInt(d.property_id) || null;
+            d.tenant_id = parseInt(d.tenant_id) || null;
+            d.unit_id = parseInt(d.unit_id) || null;
+
+            if (!d.property_id || !d.tenant_id) {
+                showToast('Property and Tenant are required', 'error');
+                return;
+            }
+
+            ['base_rent_amount', 'discounts', 'service_charge_percent', 'notice_period_days'].forEach(k => {
+                if (d[k]) d[k] = parseFloat(d[k]);
+            });
+
+            try {
+                await apiFetch('/api/leases', { method: 'POST', body: JSON.stringify(d) });
+                closeModal('addLeaseModal');
+                showToast('Lease created successfully');
+                loadActiveLease();
+                document.getElementById('leaseForm').reset();
+                // Refresh unit status card
+                loadUnit();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                const data = await apiFetch(`/api/properties/${propId}/units/${unitId}/documents`);
+                const tbody = document.getElementById('documentsTable');
+                if (!data.items || !data.items.length) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No documents uploaded</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.items.map(d => `
+                <tr>
+                    <td><strong>${d.file_name}</strong></td>
+                    <td>${d.mime_type || '-'}</td>
+                    <td>${formatDate(d.upload_date)}</td>
+                    <td><a href="/${d.file_path}" target="_blank" class="btn btn-sm btn-secondary">Download</a></td>
+                </tr>
+            `).join('');
+            } catch (e) {
+                document.getElementById('documentsTable').innerHTML = '<tr><td colspan="4">Error loading documents</td></tr>';
+            }
+        }
+
+        async function loadAssets() {
+            try {
+                const data = await apiFetch(`/api/properties/${propId}/units/${unitId}/assets`);
+                const tbody = document.getElementById('assetsTable');
+                if (!data.items || !data.items.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><p>No assets assigned to this unit</p></td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.items.map(a => `
+                <tr>
+                    <td><strong>${a.asset_name}</strong></td>
+                    <td>${a.asset_category || '-'}</td>
+                    <td>${a.asset_type || '-'}</td>
+                    <td>${a.serial_number || '-'}</td>
+                    <td><span class="badge ${a.condition_status === 'Good' || a.condition_status === 'New' ? 'badge-success' : 'badge-warning'}">${a.condition_status}</span></td>
+                    <td style="white-space:nowrap">
+                        <button class="btn btn-sm btn-secondary" onclick="unallocateAsset(${a.id})">🔓 Unallocate</button>
+                    </td>
+                </tr>
+            `).join('');
+            } catch (e) {
+                console.error(e);
+                document.getElementById('assetsTable').innerHTML = '<tr><td colspan="6" class="empty-state">Error loading assets</td></tr>';
+            }
+        }
+
+        async function uploadDocument() {
+            const fileInput = document.getElementById('docFile');
+            if (!fileInput.files[0]) return;
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const resp = await fetch(`/api/properties/${propId}/units/${unitId}/documents`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!resp.ok) throw new Error('Upload failed');
+                showToast('Document uploaded successfully');
+                closeModal('uploadDocModal');
+                loadDocuments();
+                document.getElementById('uploadForm').reset();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function saveAsset() {
+            const d = {}; new FormData(document.getElementById('assetForm')).forEach((v, k) => { d[k] = v });
+            try {
+                // Ensure property_id and unit_id are set for the new asset if they are null in form
+                if (!d.property_id) d.property_id = propId;
+                if (!d.unit_id) d.unit_id = unitId;
+
+                await apiFetch(`/api/assets`, { method: 'POST', body: JSON.stringify(d) });
+                closeModal('addAssetModal');
+                showToast('Asset created and assigned successfully');
+                loadAssets();
+                document.getElementById('assetForm').reset();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function openAllocateModal() {
+            openModal('allocateAssetModal');
+            const sel = document.getElementById('unallocatedAssetSelect');
+            sel.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const data = await apiFetch('/api/assets?allocated=false');
+                if (!data.items || !data.items.length) {
+                    sel.innerHTML = '<option value="">No unallocated assets found</option>';
+                    return;
+                }
+                sel.innerHTML = '<option value="">Select an asset</option>' +
+                    data.items.map(a => `<option value="${a.id}">${a.asset_number || 'No #'} - ${a.asset_name} (${a.asset_type || 'N/A'})</option>`).join('');
+            } catch (e) {
+                sel.innerHTML = '<option value="">Error loading assets</option>';
+            }
+        }
+
+        async function confirmAllocation() {
+            const assetId = document.getElementById('unallocatedAssetSelect').value;
+            if (!assetId) { showToast('Please select an asset', 'error'); return; }
+            try {
+                await apiFetch(`/api/assets/${assetId}/allocate`, {
+                    method: 'POST',
+                    body: JSON.stringify({ unit_id: unitId, property_id: propId })
+                });
+                closeModal('allocateAssetModal');
+                showToast('Asset allocated successfully');
+                loadAssets();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function unallocateAsset(assetId) {
+            if (!confirm('Remove this asset from this unit?')) return;
+            try {
+                await apiFetch(`/api/assets/${assetId}/unallocate`, { method: 'POST' });
+                showToast('Asset unallocated');
+                loadAssets();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        loadUnit();
+    </script>
+    {% endblock %}

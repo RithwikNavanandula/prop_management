@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% set active_page = "properties" %}
+{% block title %}Properties — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Properties{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+    <div style="display:flex;gap:12px;align-items:center">
+        <select class="form-control" style="width:160px" id="filterType" onchange="loadProperties()">
+            <option value="">All Types</option>
+            <option value="Residential">Residential</option>
+            <option value="Commercial">Commercial</option>
+            <option value="Mixed">Mixed Use</option>
+        </select>
+        <input type="text" class="form-control" style="width:240px" placeholder="Search properties..." id="searchInput"
+            oninput="loadProperties()">
+    </div>
+    <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Property</button>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Property Name</th>
+                    <th>Type</th>
+                    <th>City</th>
+                    <th>Units</th>
+                    <th>Occupancy</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="propertiesTable">
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <p>Loading...</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Property Modal -->
+<div class="modal-backdrop" id="addModal">
+    <div class="modal" style="max-width:700px">
+        <div class="modal-header">
+            <h3>Add New Property</h3><button class="modal-close" onclick="closeModal('addModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="addForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Property Code*</label><input class="form-control"
+                            name="property_code" required></div>
+                    <div class="form-group"><label class="form-label">Property Name*</label><input class="form-control"
+                            name="property_name" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Region</label>
+                        <select class="form-control" name="region_id" id="propRegionSelect">
+                            <option value="">Select Region</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Type</label>
+                        <select class="form-control" name="property_type">
+                            <option>Residential</option>
+                            <option>Commercial</option>
+                            <option>Mixed</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Total Units</label><input class="form-control"
+                            name="total_units" type="number" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Address Line 1</label><input class="form-control"
+                            name="address_line1"></div>
+                    <div class="form-group"><label class="form-label">Address Line 2</label><input class="form-control"
+                            name="address_line2"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">City</label><input class="form-control"
+                            name="city"></div>
+                    <div class="form-group"><label class="form-label">State</label><input class="form-control"
+                            name="state"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Country</label><input class="form-control"
+                            name="country" value="US"></div>
+                    <div class="form-group"><label class="form-label">Postal Code</label><input class="form-control"
+                            name="postal_code"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Latitude</label><input class="form-control"
+                            name="latitude" type="number" step="any"></div>
+                    <div class="form-group"><label class="form-label">Longitude</label><input class="form-control"
+                            name="longitude" type="number" step="any"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Total Area (sqft)</label><input
+                            class="form-control" name="total_area_sqft" type="number" step="0.01"></div>
+                    <div class="form-group"><label class="form-label">Zoning Category</label><input class="form-control"
+                            name="zoning_category"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Commercial Category</label><input
+                            class="form-control" name="commercial_category"></div>
+                    <div class="form-group"><label class="form-label">Grade</label><input class="form-control"
+                            name="grade" placeholder="e.g. A, B, C"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Common Area Factor</label><input
+                            class="form-control" name="common_area_factor" type="number" step="0.0001"></div>
+                    <div class="form-group"><label class="form-label">Parking Spaces</label><input class="form-control"
+                            name="parking_spaces" type="number" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Business Hours</label><input class="form-control"
+                            name="business_hours" placeholder="e.g. 9AM-6PM"></div>
+                    <div class="form-group"><label class="form-label">Fit-out Standard</label><input
+                            class="form-control" name="fit_out_standard"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Year Built</label><input class="form-control"
+                            name="year_built" type="number"></div>
+                    <div class="form-group"><label class="form-label">Status</label>
+                        <select class="form-control" name="status">
+                            <option>Active</option>
+                            <option>Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label class="form-label">Photo URL</label><input class="form-control"
+                        name="photo_url"></div>
+                <div class="form-group"><label class="form-label">Description</label><textarea class="form-control"
+                        name="description" rows="2"></textarea></div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary"
+                onclick="closeModal('addModal')">Cancel</button><button class="btn btn-primary"
+                onclick="saveProperty()">Save Property</button></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    async function loadProperties() {
+        const type = document.getElementById('filterType').value;
+        const search = document.getElementById('searchInput').value;
+        let url = '/api/properties?limit=100';
+        if (type) url += `&property_type=${type}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        try {
+            const data = await apiFetch(url);
+            const tbody = document.getElementById('propertiesTable');
+            if (!data.items.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="icon">🏢</div><p>No properties found</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.items.map(p => `
+            <tr>
+                <td><strong>${p.property_code}</strong></td>
+                <td><a href="/properties/${p.id}" style="color:var(--accent-light);text-decoration:none">${p.property_name}</a></td>
+                <td><span class="badge badge-${p.property_type === 'Residential' ? 'info' : p.property_type === 'Commercial' ? 'purple' : 'warning'}">${p.property_type || '-'}</span></td>
+                <td>${p.city || '-'}</td>
+                <td>${p.total_units || 0}</td>
+                <td><div class="progress-bar" style="width:80px"><div class="fill purple" style="width:${Math.random() * 100}%"></div></div></td>
+                <td>${statusBadge(p.status)}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="location.href='/properties/${p.id}'">View</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteProperty(${p.id}, '${p.property_name?.replace(/'/g, "\\'") || ''}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+        } catch (e) { console.error(e); }
+    }
+
+    async function deleteProperty(id, name) {
+        const label = name ? `\"${name}\"` : `#${id}`;
+        if (!confirm(`Delete property ${label}? This will mark it as inactive.`)) return;
+        try {
+            await apiFetch(`/api/properties/${id}`, { method: 'DELETE' });
+            showToast('Property deleted');
+            loadProperties();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    async function saveProperty() {
+        const form = document.getElementById('addForm');
+        const data = {};
+        new FormData(form).forEach((v, k) => { data[k] = v; });
+
+        data.property_code = (data.property_code || '').trim();
+        data.property_name = (data.property_name || '').trim();
+
+        ['region_id', 'total_units', 'year_built', 'parking_spaces'].forEach(k => {
+            if (data[k] === '') {
+                data[k] = null;
+                return;
+            }
+            const parsed = parseInt(data[k], 10);
+            data[k] = Number.isNaN(parsed) ? null : parsed;
+        });
+
+        ['latitude', 'longitude', 'total_area_sqft', 'common_area_factor'].forEach(k => {
+            if (data[k] === '') {
+                data[k] = null;
+                return;
+            }
+            const parsed = parseFloat(data[k]);
+            data[k] = Number.isNaN(parsed) ? null : parsed;
+        });
+
+        Object.keys(data).forEach(k => {
+            if (typeof data[k] === 'string') data[k] = data[k].trim();
+            if (data[k] === '') data[k] = null;
+        });
+        try {
+            await apiFetch('/api/properties', { method: 'POST', body: JSON.stringify(data) });
+            closeModal('addModal');
+            form.reset();
+            showToast('Property created successfully');
+            loadProperties();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    loadProperties();
+</script>
+{% endblock %}

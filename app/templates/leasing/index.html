@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% set active_page = "leases" %}
+{% block title %}Leases — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Lease Management{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <div style="display:flex;gap:12px">
+        <select class="form-control" style="width:150px" id="statusFilter" onchange="loadLeases()">
+            <option value="">All Status</option>
+            <option>Draft</option>
+            <option>Active</option>
+            <option>Expired</option>
+            <option>Terminated</option>
+        </select>
+        <input type="text" class="form-control" style="width:220px" placeholder="Search leases..." id="searchInput"
+            oninput="loadLeases()">
+    </div>
+    <button class="btn btn-primary" onclick="openModal('addLeaseModal')">+ New Lease</button>
+</div>
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Lease #</th>
+                    <th>Type</th>
+                    <th>Property</th>
+                    <th>Tenant</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Rent</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="leasesTable">
+                <tr>
+                    <td colspan="9">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addLeaseModal">
+    <div class="modal" style="max-width:850px">
+        <div class="modal-header">
+            <h3>Create New Lease</h3><button class="modal-close" onclick="closeModal('addLeaseModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="leaseForm">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Column 1: Core Details -->
+                    <div>
+                        <h4 style="margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:4px">Basic
+                            Information</h4>
+                        <div class="form-group"><label class="form-label">Lease Number*</label>
+                            <input class="form-control" name="lease_number" required placeholder="e.g. L-1001">
+                        </div>
+
+
+                        <div class="form-group"><label class="form-label">Property*</label>
+                            <select class="form-control" name="property_id" id="leasePropertySelect" required
+                                onchange="loadUnitsForSelection()">
+                                <option value="">Select Property</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Unit*</label>
+                            <select class="form-control" name="unit_id" id="leaseUnitSelect" required>
+                                <option value="">Select Unit (Choose Property first)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Tenant*</label>
+                            <select class="form-control" name="tenant_id" id="leaseTenantSelect" required>
+                                <option value="">Select Tenant</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Lease Type</label>
+                                <select class="form-control" name="lease_type">
+                                    <option>Residential</option>
+                                    <option>Commercial</option>
+                                    <option>License</option>
+                                    <option>ShortTerm</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Notice Period (Days)</label>
+                                <input class="form-control" name="notice_period_days" type="number" value="30">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Start Date*</label><input
+                                    class="form-control" name="start_date" type="date" required></div>
+                            <div class="form-group"><label class="form-label">End Date*</label><input
+                                    class="form-control" name="end_date" type="date" required></div>
+                        </div>
+                        <div class="form-group"><label class="form-label">Possession Date</label><input
+                                class="form-control" name="possession_date" type="date"></div>
+                    </div>
+
+                    <!-- Column 2: Financials & Rules -->
+                    <div>
+                        <h4 style="margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:4px">
+                            Financials & Terms</h4>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Rent Amount*</label>
+                                <input class="form-control" name="base_rent_amount" type="number" step="0.01" required>
+                            </div>
+                            <div class="form-group"><label class="form-label">Currency</label>
+                                <input class="form-control" name="base_rent_currency" value="USD">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Rent Frequency</label>
+                                <select class="form-control" name="rent_frequency">
+                                    <option>Monthly</option>
+                                    <option>Quarterly</option>
+                                    <option>Yearly</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label class="form-label">Rent Type</label>
+                                <select class="form-control" name="rent_type">
+                                    <option>Fixed</option>
+                                    <option>Variable</option>
+                                    <option>RevenueShare</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">Service Charge %</label>
+                                <input class="form-control" name="service_charge_percent" type="number" step="0.01">
+                            </div>
+                            <div class="form-group"><label class="form-label">Discounts</label>
+                                <input class="form-control" name="discounts" type="number" step="0.01" value="0">
+                            </div>
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Cam Charge Basis</label>
+                            <input class="form-control" name="cam_charge_basis" placeholder="e.g. Sqft, Fixed">
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Payment Terms</label>
+                            <input class="form-control" name="payment_terms" placeholder="e.g. Due on 1st">
+                        </div>
+
+                        <div class="form-group"><label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addLeaseModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveLease()">Create Lease</button>
+        </div>
+    </div>
+</div>
+<!-- View Lease Modal -->
+<div class="modal-backdrop" id="viewLeaseModal">
+    <div class="modal" style="max-width:850px">
+        <div class="modal-header">
+            <h3 id="viewLeaseTitle">Lease Details</h3><button class="modal-close"
+                onclick="closeModal('viewLeaseModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="viewLeaseContent"
+                style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:24px">
+                <!-- Will be populated by JS -->
+            </div>
+            <h5>Rent Schedule</h5>
+            <div class="table-container" style="margin-top:10px">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Due Date</th>
+                            <th>Period</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="viewLeaseScheduleTable"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('viewLeaseModal')">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        if (id === 'addLeaseModal') loadSelectionData();
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('active') }
+
+    async function loadSelectionData() {
+        // Load Properties
+        const props = await apiFetch('/api/properties?limit=100');
+        const pSelect = document.getElementById('leasePropertySelect');
+        pSelect.innerHTML = '<option value="">Select Property</option>' +
+            props.items.map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
+
+        // Load Tenants
+        const tenants = await apiFetch('/api/tenants?limit=100');
+        const tSelect = document.getElementById('leaseTenantSelect');
+        tSelect.innerHTML = '<option value="">Select Tenant</option>' +
+            tenants.items.map(t => `<option value="${t.id}">${t.first_name} ${t.last_name || ''}</option>`).join('');
+
+
+        // Handle pre-filling from URL
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('prop_id')) {
+            setSelectValue('leasePropertySelect', params.get('prop_id'));
+            await loadUnitsForSelection();
+            if (params.has('unit_id')) {
+                setSelectValue('leaseUnitSelect', params.get('unit_id'));
+            }
+        }
+    }
+
+    async function loadUnitsForSelection() {
+        const propId = document.getElementById('leasePropertySelect').value;
+        const uSelect = document.getElementById('leaseUnitSelect');
+        if (!propId) {
+            uSelect.innerHTML = '<option value="">Select Unit (Choose Property first)</option>';
+            return;
+        }
+        const units = await apiFetch(`/api/properties/${propId}/units`);
+        uSelect.innerHTML = '<option value="">Select Unit</option>' +
+            units.items.map(u => `<option value="${u.id}">${u.unit_number} (${u.current_status})</option>`).join('');
+    }
+
+    function setSelectValue(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    }
+
+    async function loadLeases() {
+        const st = document.getElementById('statusFilter').value;
+        const q = document.getElementById('searchInput').value;
+        let url = '/api/leases?limit=100';
+        if (st) url += `&status=${st}`; if (q) url += `&search=${encodeURIComponent(q)}`;
+        const data = await apiFetch(url);
+        const tb = document.getElementById('leasesTable');
+        if (!data.items.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state"><p>No leases found</p></td></tr>'; return; }
+        tb.innerHTML = data.items.map(l => `<tr>
+        <td><strong>${l.lease_number}</strong></td><td>${l.lease_type}</td>
+        <td>Property #${l.property_id}</td><td>Tenant #${l.tenant_id}</td>
+        <td>${formatDate(l.start_date)}</td><td>${formatDate(l.end_date)}</td>
+        <td>${formatCurrency(l.base_rent_amount, l.base_rent_currency || 'USD')}</td>
+        <td>${statusBadge(l.lease_status)}</td>
+        <td>
+            <div style="display:flex; gap:4px">
+                <button class="btn btn-sm btn-secondary" onclick="viewLease(${l.id})">View</button>
+                <button class="btn btn-sm btn-secondary" onclick="activateLease(${l.id})">Activate</button>
+            </div>
+        </td>
+    </tr>`).join('');
+    }
+
+    async function viewLease(id) {
+        const l = await apiFetch(`/api/leases/${id}`);
+        openModal('viewLeaseModal');
+
+        document.getElementById('viewLeaseTitle').textContent = `Lease #${l.lease_number}`;
+        document.getElementById('viewLeaseContent').innerHTML = `
+            <div>
+                <p><strong>Property:</strong> #${l.property_id}</p>
+                <p><strong>Unit:</strong> #${l.unit_id || 'N/A'}</p>
+                <p><strong>Tenant:</strong> #${l.tenant_id}</p>
+                <p><strong>Type:</strong> ${l.lease_type}</p>
+            </div>
+            <div>
+                <p><strong>Dates:</strong> ${formatDate(l.start_date)} to ${formatDate(l.end_date)}</p>
+                <p><strong>Rent:</strong> ${formatCurrency(l.base_rent_amount, l.base_rent_currency)} (${l.rent_frequency})</p>
+                <p><strong>Status:</strong> ${statusBadge(l.lease_status)}</p>
+            </div>
+        `;
+
+        const sched = l.rent_schedules || [];
+        document.getElementById('viewLeaseScheduleTable').innerHTML = sched.map(s => `
+            <tr>
+                <td><strong>${formatDate(s.due_date)}</strong></td>
+                <td><small>${formatDate(s.period_start)} - ${formatDate(s.period_end)}</small></td>
+                <td>${formatCurrency(s.total_amount || s.scheduled_amount, s.currency)}</td>
+                <td>${s.is_paid ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">Unpaid</span>'}</td>
+            </tr>
+        `).join('') || '<tr><td colspan="4" class="empty-state">No schedule items</td></tr>';
+    }
+
+    async function saveLease() {
+        const d = {}; new FormData(document.getElementById('leaseForm')).forEach((v, k) => { d[k] = v });
+
+        // Convert and validate IDs
+        d.property_id = parseInt(d.property_id) || null;
+        d.tenant_id = parseInt(d.tenant_id) || null;
+        d.unit_id = parseInt(d.unit_id) || null;
+
+        if (!d.property_id || !d.tenant_id) {
+            showToast('Property and Tenant are required', 'error');
+            return;
+        }
+
+        ['base_rent_amount', 'discounts', 'service_charge_percent', 'notice_period_days'].forEach(k => {
+            if (d[k]) d[k] = parseFloat(d[k]);
+        });
+
+        try {
+            await apiFetch('/api/leases', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('addLeaseModal');
+            showToast('Lease created successfully');
+            loadLeases();
+            document.getElementById('leaseForm').reset();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    async function activateLease(id) {
+        await apiFetch(`/api/leases/${id}/activate`, { method: 'POST' }); showToast('Lease activated'); loadLeases();
+    }
+
+    loadLeases();
+
+    // Auto-open if redirected from unit detail
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'new') {
+        openModal('addLeaseModal');
+    }
+</script>
+{% endblock %}

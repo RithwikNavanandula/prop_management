@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - {{ settings.APP_NAME }}</title>
+    <meta name="description" content="Property Management Software - Secure Login">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function () {
+            const theme = localStorage.getItem('app-theme') || 'light-cloud';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+
+<body class="login-page">
+    <div class="login-shell">
+        <section class="login-brand-panel">
+            <div>
+                <h1 class="brand-title">Property operations with one modern control plane.</h1>
+                <p class="brand-subtitle">
+                    Manage portfolio performance, leasing, finance, and maintenance from a single workflow-first
+                    workspace.
+                </p>
+                <div class="login-metrics">
+                    <div class="metric">
+                        <div class="label">Automation</div>
+                        <div class="value">Workflow + Jobs</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Coverage</div>
+                        <div class="value">End-to-End PM</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Realtime</div>
+                        <div class="value">Dashboards</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Security</div>
+                        <div class="value">Role Based Access</div>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.78rem; color:rgba(226,232,240,0.7)">PropManager Pro v2 frontend</p>
+        </section>
+
+        <section class="login-panel">
+            <div class="login-card animate-in">
+                <div class="logo-section">
+                    <div class="logo-icon">PM</div>
+                    <h2>{{ settings.APP_NAME }}</h2>
+                    <p class="subtitle">Sign in to continue</p>
+                </div>
+
+                <div id="loginError" class="login-error"></div>
+
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" id="username" class="form-control" placeholder="Enter your username" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="loginBtn">Sign In</button>
+                </form>
+
+                <p class="login-help">Default credentials: admin / admin123</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errDiv = document.getElementById('loginError');
+            btn.textContent = 'Signing in...';
+            btn.disabled = true;
+            errDiv.style.display = 'none';
+
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value,
+                    }),
+                });
+
+                const data = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Login failed');
+                }
+                window.location.href = '/dashboard';
+            } catch (err) {
+                errDiv.textContent = err.message;
+                errDiv.style.display = 'block';
+                btn.textContent = 'Sign In';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>

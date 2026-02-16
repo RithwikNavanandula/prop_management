@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% set active_page = "reports" %}
+{% block title %}Reports — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card purple">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value">Rent Roll</div>
+        <div class="stat-label">Current active leases and rent summary</div>
+        <button class="btn btn-sm btn-secondary" style="margin-top:12px" onclick="loadRentRoll()">Generate</button>
+    </div>
+    <div class="stat-card teal">
+        <div class="stat-icon">📉</div>
+        <div class="stat-value">Aging Report</div>
+        <div class="stat-label">Outstanding receivables by aging bucket</div>
+        <button class="btn btn-sm btn-secondary" style="margin-top:12px" onclick="loadAging()">Generate</button>
+    </div>
+    <div class="stat-card pink">
+        <div class="stat-icon">🔧</div>
+        <div class="stat-value">Maintenance</div>
+        <div class="stat-label">SLA compliance and maintenance metrics</div>
+        <button class="btn btn-sm btn-secondary" style="margin-top:12px" onclick="loadMaintReport()">Generate</button>
+    </div>
+    <div class="stat-card gold">
+        <div class="stat-icon">🏠</div>
+        <div class="stat-value">Occupancy</div>
+        <div class="stat-label">Vacancy rates across all properties</div>
+        <button class="btn btn-sm btn-secondary" style="margin-top:12px" onclick="loadOccupancy()">Generate</button>
+    </div>
+</div>
+
+<div class="card" id="reportOutput" style="display:none">
+    <div class="card-header">
+        <h3 id="reportTitle">Report</h3>
+    </div>
+    <div id="reportContent"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadRentRoll() {
+        showReport('Rent Roll', `<p>Loading...</p>`);
+        const data = await apiFetch('/api/leases?status=Active&limit=200');
+        let html = '<table><thead><tr><th>Lease</th><th>Property</th><th>Unit</th><th>Tenant</th><th>Rent</th><th>Start</th><th>End</th></tr></thead><tbody>';
+        let total = 0;
+        data.items.forEach(l => {
+            total += parseFloat(l.base_rent_amount) || 0;
+            html += `<tr><td>${l.lease_number}</td><td>${l.property_id}</td><td>${l.unit_id || '-'}</td><td>${l.tenant_id}</td><td>${formatCurrency(l.base_rent_amount)}</td><td>${formatDate(l.start_date)}</td><td>${formatDate(l.end_date)}</td></tr>`;
+        });
+        html += `</tbody></table><div style="padding:16px;font-weight:700;font-size:16px;text-align:right">Total Monthly Rent: ${formatCurrency(total)}</div>`;
+        showReport(`Rent Roll (${data.items.length} active leases)`, html);
+    }
+
+    async function loadAging() {
+        showReport('Aging Report', '<p>Loading...</p>');
+        const data = await apiFetch('/api/dashboard/finance');
+        const a = data.aging_buckets;
+        let html = `<table><thead><tr><th>Bucket</th><th>Amount</th></tr></thead><tbody>`;
+        Object.entries(a).forEach(([k, v]) => { html += `<tr><td>${k} days</td><td>${formatCurrency(v)}</td></tr>`; });
+        html += `</tbody></table><div style="padding:16px;font-weight:700;text-align:right">Total Arrears: ${formatCurrency(data.total_arrears)}</div>`;
+        showReport('Aging Report', html);
+    }
+
+    async function loadMaintReport() {
+        showReport('Maintenance Report', '<p>Loading...</p>');
+        const data = await apiFetch('/api/dashboard/maintenance');
+        let html = `<div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card teal"><div class="stat-value">${data.total_open}</div><div class="stat-label">Open Requests</div></div>
+        <div class="stat-card pink"><div class="stat-value">${data.sla_breached}</div><div class="stat-label">SLA Breached</div></div></div>`;
+        html += `<table><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>`;
+        Object.entries(data.by_category || {}).forEach(([k, v]) => { html += `<tr><td>${k}</td><td>${v}</td></tr>`; });
+        html += `</tbody></table>`;
+        showReport('Maintenance Report', html);
+    }
+
+    async function loadOccupancy() {
+        showReport('Occupancy Report', '<p>Loading...</p>');
+        const data = await apiFetch('/api/dashboard/portfolio');
+        let html = `<div class="stats-grid"><div class="stat-card teal"><div class="stat-value">${data.occupancy_rate}%</div><div class="stat-label">Overall Occupancy</div></div>
+        <div class="stat-card purple"><div class="stat-value">${data.occupied_units}</div><div class="stat-label">Occupied</div></div>
+        <div class="stat-card pink"><div class="stat-value">${data.vacant_units}</div><div class="stat-label">Vacant</div></div></div>`;
+        html += `<table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>`;
+        Object.entries(data.unit_status_breakdown || {}).forEach(([k, v]) => { html += `<tr><td>${statusBadge(k)}</td><td>${v}</td></tr>`; });
+        html += `</tbody></table>`;
+        showReport('Occupancy Report', html);
+    }
+
+    function showReport(title, content) {
+        document.getElementById('reportOutput').style.display = 'block';
+        document.getElementById('reportTitle').textContent = title;
+        document.getElementById('reportContent').innerHTML = content;
+    }
+</script>
+{% endblock %}

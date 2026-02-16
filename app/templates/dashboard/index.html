@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Portfolio Dashboard{% endblock %}
+
+{% block content %}
+<div id="dashboardContent">
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card purple animate-in">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-value" id="statProperties">-</div>
+            <div class="stat-label">Total Properties</div>
+        </div>
+        <div class="stat-card teal animate-in" style="animation-delay:0.1s">
+            <div class="stat-icon">🏠</div>
+            <div class="stat-value" id="statUnits">-</div>
+            <div class="stat-label">Total Units</div>
+        </div>
+        <div class="stat-card pink animate-in" style="animation-delay:0.2s">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" id="statOccupancy">-</div>
+            <div class="stat-label">Occupancy Rate</div>
+        </div>
+        <div class="stat-card gold animate-in" style="animation-delay:0.3s">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value" id="statRevenue">-</div>
+            <div class="stat-label">Total Revenue</div>
+        </div>
+    </div>
+
+    <!-- Secondary Stats -->
+    <div class="stats-grid">
+        <div class="stat-card purple">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="statLeases">-</div>
+            <div class="stat-label">Active Leases</div>
+        </div>
+        <div class="stat-card teal">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value" id="statExpiring">-</div>
+            <div class="stat-label">Expiring in 90 Days</div>
+        </div>
+        <div class="stat-card pink">
+            <div class="stat-icon">🔧</div>
+            <div class="stat-value" id="statMaintenance">-</div>
+            <div class="stat-label">Open Maintenance</div>
+        </div>
+        <div class="stat-card gold">
+            <div class="stat-icon">📉</div>
+            <div class="stat-value" id="statArrears">-</div>
+            <div class="stat-label">Outstanding Amount</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>Unit Status Breakdown</h3>
+            <div style="position:relative;height:260px;">
+                <canvas id="unitStatusChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Monthly Revenue (6 Months)</h3>
+            <div style="position:relative;height:260px;">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>Arrears Aging</h3>
+            <div style="position:relative;height:260px;">
+                <canvas id="agingChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Maintenance by Priority</h3>
+            <div style="position:relative;height:260px;">
+                <canvas id="maintChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const chartColors = {
+        purple: '#6c5ce7', teal: '#00cec9', pink: '#fd79a8',
+        gold: '#fdcb6e', blue: '#74b9ff', red: '#ff6b6b',
+        green: '#55efc4', gray: '#636e72'
+    };
+
+    Chart.defaults.color = '#9ca3bf';
+    Chart.defaults.borderColor = '#2d3250';
+
+    async function loadDashboard() {
+        try {
+            const [portfolio, finance, maint] = await Promise.all([
+                apiFetch('/api/dashboard/portfolio'),
+                apiFetch('/api/dashboard/finance'),
+                apiFetch('/api/dashboard/maintenance'),
+            ]);
+
+            // Stats
+            document.getElementById('statProperties').textContent = portfolio.total_properties;
+            document.getElementById('statUnits').textContent = portfolio.total_units;
+            document.getElementById('statOccupancy').textContent = portfolio.occupancy_rate + '%';
+            document.getElementById('statRevenue').textContent = formatCurrency(portfolio.total_revenue);
+            document.getElementById('statLeases').textContent = portfolio.active_leases;
+            document.getElementById('statExpiring').textContent = portfolio.expiring_leases_90d;
+            document.getElementById('statMaintenance').textContent = portfolio.open_maintenance_requests;
+            document.getElementById('statArrears').textContent = formatCurrency(portfolio.outstanding_amount);
+
+            // Unit Status Doughnut
+            const unitData = portfolio.unit_status_breakdown || {};
+            new Chart(document.getElementById('unitStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(unitData),
+                    datasets: [{
+                        data: Object.values(unitData),
+                        backgroundColor: [chartColors.teal, chartColors.red, chartColors.gold, chartColors.blue, chartColors.gray],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { padding: 16, usePointStyle: true } } },
+                    cutout: '65%',
+                }
+            });
+
+            // Revenue Bar
+            const revData = finance.monthly_revenue || [];
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'bar',
+                data: {
+                    labels: revData.map(r => r.month),
+                    datasets: [{
+                        label: 'Revenue', data: revData.map(r => r.revenue),
+                        backgroundColor: chartColors.purple + '99',
+                        borderColor: chartColors.purple, borderWidth: 1, borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#2d325033' } } }
+                }
+            });
+
+            // Aging
+            const aging = finance.aging_buckets || {};
+            new Chart(document.getElementById('agingChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(aging),
+                    datasets: [{
+                        label: 'Amount', data: Object.values(aging),
+                        backgroundColor: [chartColors.green, chartColors.gold, chartColors.pink, chartColors.red],
+                        borderWidth: 0, borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Maintenance
+            const mp = maint.by_priority || {};
+            new Chart(document.getElementById('maintChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(mp),
+                    datasets: [{
+                        data: Object.values(mp),
+                        backgroundColor: [chartColors.red, chartColors.pink, chartColors.gold, chartColors.blue, chartColors.gray],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { padding: 16, usePointStyle: true } } },
+                    cutout: '65%',
+                }
+            });
+        } catch (err) {
+            console.error('Dashboard load error:', err);
+        }
+    }
+
+    loadDashboard();
+</script>
+{% endblock %}
