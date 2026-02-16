@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% set active_page = "tenant-portal" %}
+{% block title %}Tenant Portal — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Tenant Portal{% endblock %}
+
+{% block content %}
+<div class="stats-grid" id="tenantStats"></div>
+
+<div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+        <h3>Active Leases</h3>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Lease #</th>
+                    <th>Property</th>
+                    <th>Unit</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tenantLeases"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Invoices</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Due</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tenantInvoices"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Maintenance</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Req #</th>
+                        <th>Category</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tenantRequests"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadTenantPortal() {
+        try {
+            const data = await apiFetch('/api/portal/tenant/overview');
+            const leases = data.leases || [];
+            const invoices = data.invoices || [];
+            const requests = data.maintenance_requests || [];
+
+            const openInvoices = invoices.filter(i => ['Posted', 'PartiallyPaid', 'Overdue'].includes(i.invoice_status || i.status));
+            const openRequests = requests.filter(r => ['New', 'Acknowledged', 'InProgress'].includes(r.status));
+
+            document.getElementById('tenantStats').innerHTML = `
+                <div class="stat-card teal">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-value">${leases.length}</div>
+                    <div class="stat-label">Leases</div>
+                </div>
+                <div class="stat-card gold">
+                    <div class="stat-icon">💳</div>
+                    <div class="stat-value">${openInvoices.length}</div>
+                    <div class="stat-label">Open Invoices</div>
+                </div>
+                <div class="stat-card pink">
+                    <div class="stat-icon">🔧</div>
+                    <div class="stat-value">${openRequests.length}</div>
+                    <div class="stat-label">Open Requests</div>
+                </div>
+            `;
+
+            const leaseBody = document.getElementById('tenantLeases');
+            leaseBody.innerHTML = leases.length ? leases.map(l => `
+                <tr>
+                    <td><strong>${l.lease_number}</strong></td>
+                    <td>${l.property_id || '-'}</td>
+                    <td>${l.unit_id || '-'}</td>
+                    <td>${formatDate(l.start_date)}</td>
+                    <td>${formatDate(l.end_date)}</td>
+                    <td>${statusBadge(l.lease_status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="6" class="empty-state">No leases found</td></tr>';
+
+            const invBody = document.getElementById('tenantInvoices');
+            invBody.innerHTML = invoices.length ? invoices.slice(0, 10).map(i => `
+                <tr>
+                    <td><strong>${i.invoice_number}</strong></td>
+                    <td>${formatDate(i.invoice_date)}</td>
+                    <td>${formatDate(i.due_date)}</td>
+                    <td>${formatCurrency(i.total_amount || i.document_amount, i.document_currency || 'USD')}</td>
+                    <td>${statusBadge(i.invoice_status || i.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="empty-state">No invoices found</td></tr>';
+
+            const reqBody = document.getElementById('tenantRequests');
+            reqBody.innerHTML = requests.length ? requests.slice(0, 10).map(r => `
+                <tr>
+                    <td><strong>${r.request_number}</strong></td>
+                    <td>${r.category || '-'}</td>
+                    <td>${r.priority || '-'}</td>
+                    <td>${statusBadge(r.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4" class="empty-state">No requests found</td></tr>';
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    loadTenantPortal();
+</script>
+{% endblock %}

@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from typing import Optional
 from decimal import Decimal, InvalidOperation
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.properties.models import (
     Property, Building, Floor, Unit, Asset, UnitAsset, Owner, Tenant, Vendor,
@@ -19,7 +19,11 @@ import shutil
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/properties", tags=["Properties"])
+router = APIRouter(
+    prefix="/api/properties",
+    tags=["Properties"],
+    dependencies=[Depends(require_permissions(["properties", "portfolio"]))],
+)
 
 NULL_LIKE_STRINGS = {"", "null", "none", "nan"}
 
@@ -426,7 +430,11 @@ def _doc_dict(d):
 
 
 # --- Tenants ---
-tenants_router = APIRouter(prefix="/api/tenants", tags=["Tenants"])
+tenants_router = APIRouter(
+    prefix="/api/tenants",
+    tags=["Tenants"],
+    dependencies=[Depends(require_permissions(["tenants", "leases", "portfolio"]))],
+)
 
 
 @tenants_router.get("")
@@ -485,7 +493,11 @@ def delete_tenant(tenant_id: int, db: Session = Depends(get_db), user: UserAccou
 
 
 # --- Owners ---
-owners_router = APIRouter(prefix="/api/owners", tags=["Owners"])
+owners_router = APIRouter(
+    prefix="/api/owners",
+    tags=["Owners"],
+    dependencies=[Depends(require_permissions(["owners", "portfolio"]))],
+)
 
 
 @owners_router.get("")
@@ -538,7 +550,11 @@ def delete_owner(owner_id: int, db: Session = Depends(get_db), user: UserAccount
 
 
 # --- Vendors ---
-vendors_router = APIRouter(prefix="/api/vendors", tags=["Vendors"])
+vendors_router = APIRouter(
+    prefix="/api/vendors",
+    tags=["Vendors"],
+    dependencies=[Depends(require_permissions(["vendors", "maintenance", "work_orders"]))],
+)
 
 
 @vendors_router.get("")

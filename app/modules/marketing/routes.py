@@ -4,13 +4,17 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.marketing.models import (
     Listing, Lead, Application, ScreeningResult
 )
 
-router = APIRouter(prefix="/api/marketing", tags=["Marketing"])
+router = APIRouter(
+    prefix="/api/marketing",
+    tags=["Marketing"],
+    dependencies=[Depends(require_permissions(["marketing", "sales", "crm"]))],
+)
 
 
 # --- Listings ---

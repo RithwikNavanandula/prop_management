@@ -6,7 +6,7 @@ from sqlalchemy import func as sqlfunc
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.properties.models import Property, Unit
 from app.modules.leasing.models import Lease, RentSchedule
@@ -15,7 +15,11 @@ from app.modules.maintenance.models import MaintenanceRequest, WorkOrder
 from app.modules.accounting.models import OwnerDistribution
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+router = APIRouter(
+    prefix="/api/dashboard",
+    tags=["Dashboard"],
+    dependencies=[Depends(require_permissions(["dashboard", "reports", "portfolio"]))],
+)
 
 
 def _tenant_filter(q, model, user):

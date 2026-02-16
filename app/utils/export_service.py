@@ -8,14 +8,18 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.properties.models import Property, Unit
 from app.modules.leasing.models import Lease
 from app.modules.billing.models import Invoice, Payment
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/export", tags=["Export"])
+router = APIRouter(
+    prefix="/api/export",
+    tags=["Export"],
+    dependencies=[Depends(require_permissions(["export", "reports", "portfolio"]))],
+)
 
 
 def _rows_to_csv(rows: list[dict]) -> io.StringIO:

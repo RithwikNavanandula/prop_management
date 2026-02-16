@@ -130,3 +130,35 @@ class BankReconciliation(Base):
     status = Column(String(20), default="InProgress")
     reconciled_by = Column(Integer)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class OwnerStatement(Base):
+    __tablename__ = "owner_statements"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False)
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+    total_income = Column(Numeric(14, 2), default=0)
+    total_expenses = Column(Numeric(14, 2), default=0)
+    net_amount = Column(Numeric(14, 2), default=0)
+    currency = Column(String(10), default="USD")
+    status = Column(String(20), default="Draft")
+    statement_file_path = Column(String(500))
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class VendorInvoice(Base):
+    __tablename__ = "vendor_invoices"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"))
+    invoice_number = Column(String(50), nullable=False, unique=True, index=True)
+    invoice_date = Column(Date, nullable=False)
+    due_date = Column(Date)
+    amount = Column(Numeric(14, 2), nullable=False)
+    currency = Column(String(10), default="USD")
+    status = Column(String(20), default="Pending")
+    invoice_file_path = Column(String(500))
+    created_at = Column(DateTime, server_default=func.now())

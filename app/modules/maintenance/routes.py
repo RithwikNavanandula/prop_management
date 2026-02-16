@@ -4,14 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.maintenance.models import (
     MaintenanceRequest, WorkOrder, MaintenanceSLA, MaintenanceAttachment
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/maintenance", tags=["Maintenance"])
+router = APIRouter(
+    prefix="/api/maintenance",
+    tags=["Maintenance"],
+    dependencies=[Depends(require_permissions(["maintenance", "work_orders", "portfolio"]))],
+)
 
 
 # ─── Requests ───

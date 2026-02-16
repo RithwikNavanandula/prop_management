@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set active_page = "owner-portal" %}
+{% block title %}Owner Portal — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Owner Portal{% endblock %}
+
+{% block content %}
+<div class="stats-grid" id="ownerStats"></div>
+
+<div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+        <h3>Owned Properties</h3>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Property</th>
+                    <th>Type</th>
+                    <th>City</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="ownerProperties"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Distributions</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Gross</th>
+                        <th>Net</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="ownerDistributions"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Statements</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Net</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="ownerStatements"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadOwnerPortal() {
+        try {
+            const data = await apiFetch('/api/portal/owner/overview');
+            const properties = data.properties || [];
+            const distributions = data.distributions || [];
+            const statements = data.statements || [];
+
+            const totalNet = distributions.reduce((sum, d) => sum + parseFloat(d.net_distribution || 0), 0);
+
+            document.getElementById('ownerStats').innerHTML = `
+                <div class="stat-card teal">
+                    <div class="stat-icon">🏢</div>
+                    <div class="stat-value">${properties.length}</div>
+                    <div class="stat-label">Properties</div>
+                </div>
+                <div class="stat-card gold">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value">${formatCurrency(totalNet)}</div>
+                    <div class="stat-label">Net Distributed</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-value">${statements.length}</div>
+                    <div class="stat-label">Statements</div>
+                </div>
+            `;
+
+            const propBody = document.getElementById('ownerProperties');
+            propBody.innerHTML = properties.length ? properties.map(p => `
+                <tr>
+                    <td><strong>${p.property_name || p.property_code}</strong></td>
+                    <td>${p.property_type || '-'}</td>
+                    <td>${p.city || '-'}</td>
+                    <td>${statusBadge(p.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4" class="empty-state">No properties found</td></tr>';
+
+            const distBody = document.getElementById('ownerDistributions');
+            distBody.innerHTML = distributions.length ? distributions.slice(0, 10).map(d => `
+                <tr>
+                    <td>${formatDate(d.period_start)} - ${formatDate(d.period_end)}</td>
+                    <td>${formatCurrency(d.gross_income, d.currency || 'USD')}</td>
+                    <td>${formatCurrency(d.net_distribution, d.currency || 'USD')}</td>
+                    <td>${statusBadge(d.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4" class="empty-state">No distributions found</td></tr>';
+
+            const stmtBody = document.getElementById('ownerStatements');
+            stmtBody.innerHTML = statements.length ? statements.slice(0, 10).map(s => `
+                <tr>
+                    <td>${formatDate(s.period_start)} - ${formatDate(s.period_end)}</td>
+                    <td>${formatCurrency(s.net_amount, s.currency || 'USD')}</td>
+                    <td>${statusBadge(s.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="3" class="empty-state">No statements found</td></tr>';
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    loadOwnerPortal();
+</script>
+{% endblock %}

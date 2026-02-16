@@ -12,6 +12,8 @@ from app.config import get_settings
 from app.database import get_db, init_db, Base, engine
 from app.auth.dependencies import get_current_user_from_token
 from app.auth.models import UserAccount, Role
+from app.modules.properties.models import TenantOrg
+from app.modules.system.models import OrgSettings, Country, Currency
 from app.auth.routes import router as auth_router
 from app.modules.properties.routes import router as properties_router, tenants_router, owners_router, vendors_router
 from app.modules.properties.asset_routes import router as assets_router
@@ -29,6 +31,7 @@ from app.modules.workflow.routes import router as workflow_router
 from app.utils.export_service import router as export_router
 from app.utils.automation_routes import router as automation_router
 from app.modules.utilities.routes import router as utilities_router
+from app.modules.portal.routes import router as portal_router
 from app.middleware.audit import AuditMiddleware
 
 # Import all models so that Base.metadata knows about them
@@ -42,6 +45,7 @@ from app.modules.marketing import models as _mkm
 from app.modules.compliance import models as _cpm
 from app.modules.workflow import models as _wm
 from app.modules.utilities import models as _um
+from app.modules.system import models as _sm
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -53,25 +57,102 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     Base.metadata.create_all(bind=engine)
 
-    # Seed default roles if empty
+    # Seed/update default roles idempotently.
     db = next(get_db())
     try:
-        if db.query(Role).count() == 0:
-            roles = [
-                Role(id=1, role_name="admin", description="Full system access", is_system=True,
-                     permissions={"all": True}),
-                Role(id=2, role_name="manager", description="Property manager", is_system=True,
-                     permissions={"properties": True, "leases": True, "billing": True, "maintenance": True}),
-                Role(id=3, role_name="owner", description="Property owner portal", is_system=True,
-                     permissions={"portfolio": True, "reports": True}),
-                Role(id=4, role_name="tenant", description="Tenant portal", is_system=True,
-                     permissions={"lease": True, "payments": True, "maintenance": True}),
-                Role(id=5, role_name="vendor", description="Vendor/Maintenance portal", is_system=True,
-                     permissions={"work_orders": True}),
-                Role(id=6, role_name="accountant", description="Finance portal", is_system=True,
-                     permissions={"billing": True, "accounting": True, "reports": True}),
-            ]
-            db.add_all(roles)
+        role_defaults = [
+            (1, "admin", "Full system access", {"all": True}),
+            (
+                2,
+                "manager",
+                "Property manager",
+                {
+                    "properties": True,
+                    "leases": True,
+                    "maintenance": True,
+                    "work_orders": True,
+                    "billing": True,
+                    "payments": True,
+                    "tenants": True,
+                    "owners": True,
+                    "vendors": True,
+                    "utilities": True,
+                    "dashboard": True,
+                    "reports": True,
+                    "export": True,
+                    "crm": True,
+                    "marketing": True,
+                    "compliance": True,
+                    "workflow": True,
+                    "automation": True,
+                    "portfolio": True,
+                },
+            ),
+            (3, "owner", "Property owner portal", {"portfolio": True, "reports": True}),
+            (4, "tenant", "Tenant portal", {"lease": True, "payments": True, "maintenance": True}),
+            (5, "vendor", "Vendor/Maintenance portal", {"work_orders": True, "maintenance": True}),
+            (6, "accountant", "Finance portal", {"billing": True, "accounting": True, "reports": True, "export": True}),
+            (7, "support", "Support admin", {"users": True, "system": True, "reports": True}),
+        ]
+        for role_id, role_name, description, default_perms in role_defaults:
+            role = db.query(Role).filter(Role.id == role_id).first()
+            if not role:
+                db.add(
+                    Role(
+                        id=role_id,
+                        role_name=role_name,
+                        description=description,
+                        permissions=default_perms,
+                        is_system=True,
+                        is_active=True,
+                    )
+                )
+                continue
+            current_perms = role.permissions if isinstance(role.permissions, dict) else {}
+            merged_perms = {**default_perms, **current_perms}
+            role.role_name = role.role_name or role_name
+            role.description = role.description or description
+            role.permissions = merged_perms
+            role.is_system = True
+            if role.is_active is None:
+                role.is_active = True
+        db.commit()
+
+        # Seed minimal geo data if missing
+        if db.query(Country).count() == 0:
+            db.add_all([
+                Country(country_code="US", country_name="United States", iso3="USA",
+                        default_currency_code="USD", default_timezone="America/New_York", phone_code="+1"),
+                Country(country_code="GB", country_name="United Kingdom", iso3="GBR",
+                        default_currency_code="GBP", default_timezone="Europe/London", phone_code="+44"),
+            ])
+            db.commit()
+
+        if db.query(Currency).count() == 0:
+            db.add_all([
+                Currency(currency_code="USD", currency_name="US Dollar", symbol="$", minor_units=2),
+                Currency(currency_code="GBP", currency_name="British Pound", symbol="£", minor_units=2),
+            ])
+            db.commit()
+
+        # Create default tenant org if empty
+        org = db.query(TenantOrg).first()
+        if not org:
+            org = TenantOrg(org_name="Default Org", org_code="DEFAULT", subdomain="default", plan="standard", status="Active")
+            db.add(org)
+            db.commit()
+            db.refresh(org)
+
+        if db.query(OrgSettings).filter(OrgSettings.tenant_org_id == org.id).count() == 0:
+            db.add(OrgSettings(
+                tenant_org_id=org.id,
+                base_currency="USD",
+                country_code="US",
+                timezone="America/New_York",
+                locale="en-US",
+                fiscal_year_start_month=1,
+                tax_inclusive=False,
+            ))
             db.commit()
 
         # Create default admin user
@@ -81,9 +162,15 @@ async def lifespan(app: FastAPI):
                 username="admin", email="admin@propmanager.com",
                 password_hash=hash_password("admin123"),
                 full_name="System Administrator", role_id=1, is_active=True,
+                tenant_org_id=org.id,
             )
             db.add(admin)
             db.commit()
+        else:
+            admin = db.query(UserAccount).filter(UserAccount.username == "admin").first()
+            if admin and not admin.tenant_org_id:
+                admin.tenant_org_id = org.id
+                db.commit()
     finally:
         db.close()
 
@@ -144,6 +231,7 @@ app.include_router(export_router)
 app.include_router(automation_router)
 app.include_router(assets_router)
 app.include_router(utilities_router)
+app.include_router(portal_router)
 
 
 # --- Health Check ---
@@ -170,6 +258,39 @@ async def dashboard_page(request: Request, user: UserAccount = Depends(get_curre
         return RedirectResponse(url="/login")
     role = db.query(Role).filter(Role.id == user.role_id).first()
     return templates.TemplateResponse("dashboard/index.html", {
+        "request": request, "user": user, "role": role, "settings": settings
+    })
+
+
+@app.get("/portal/tenant", response_class=HTMLResponse)
+async def tenant_portal_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
+                              db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login")
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    return templates.TemplateResponse("portal/tenant.html", {
+        "request": request, "user": user, "role": role, "settings": settings
+    })
+
+
+@app.get("/portal/owner", response_class=HTMLResponse)
+async def owner_portal_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
+                             db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login")
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    return templates.TemplateResponse("portal/owner.html", {
+        "request": request, "user": user, "role": role, "settings": settings
+    })
+
+
+@app.get("/portal/vendor", response_class=HTMLResponse)
+async def vendor_portal_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
+                              db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login")
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    return templates.TemplateResponse("portal/vendor.html", {
         "request": request, "user": user, "role": role, "settings": settings
     })
 

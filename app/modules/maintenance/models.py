@@ -112,3 +112,17 @@ class MaintenanceAttachment(Base):
     mime_type = Column(String(100))
     uploaded_by = Column(Integer)
     uploaded_at = Column(DateTime, server_default=func.now())
+
+
+class WorkOrderTimeEntry(Base):
+    __tablename__ = "work_order_time_entries"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"))
+    staff_id = Column(Integer, ForeignKey("staff_users.id"))
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    hours = Column(Numeric(6, 2), default=0)
+    notes = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())

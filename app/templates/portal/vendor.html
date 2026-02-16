@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% set active_page = "vendor-portal" %}
+{% block title %}Vendor Portal — {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Vendor Portal{% endblock %}
+
+{% block content %}
+<div class="stats-grid" id="vendorStats"></div>
+
+<div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+        <h3>Work Orders</h3>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>WO #</th>
+                    <th>Property</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                    <th>Scheduled</th>
+                </tr>
+            </thead>
+            <tbody id="vendorWorkOrders"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Time Entries</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>WO #</th>
+                        <th>Hours</th>
+                        <th>Start</th>
+                        <th>End</th>
+                    </tr>
+                </thead>
+                <tbody id="vendorTimeEntries"></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Invoices</h3>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="vendorInvoices"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadVendorPortal() {
+        try {
+            const data = await apiFetch('/api/portal/vendor/overview');
+            const workOrders = data.work_orders || [];
+            const timeEntries = data.time_entries || [];
+            const invoices = data.invoices || [];
+
+            const openOrders = workOrders.filter(w => ['Open', 'InProgress'].includes(w.status));
+            const totalHours = timeEntries.reduce((sum, t) => sum + parseFloat(t.hours || 0), 0);
+
+            document.getElementById('vendorStats').innerHTML = `
+                <div class="stat-card teal">
+                    <div class="stat-icon">🧰</div>
+                    <div class="stat-value">${openOrders.length}</div>
+                    <div class="stat-label">Open Work Orders</div>
+                </div>
+                <div class="stat-card gold">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-value">${totalHours.toFixed(1)}</div>
+                    <div class="stat-label">Logged Hours</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-icon">🧾</div>
+                    <div class="stat-value">${invoices.length}</div>
+                    <div class="stat-label">Invoices</div>
+                </div>
+            `;
+
+            const woBody = document.getElementById('vendorWorkOrders');
+            woBody.innerHTML = workOrders.length ? workOrders.slice(0, 15).map(w => `
+                <tr>
+                    <td><strong>${w.work_order_number}</strong></td>
+                    <td>${w.property_id || '-'}</td>
+                    <td>${w.unit_id || '-'}</td>
+                    <td>${statusBadge(w.status)}</td>
+                    <td>${formatDate(w.scheduled_start)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="empty-state">No work orders found</td></tr>';
+
+            const timeBody = document.getElementById('vendorTimeEntries');
+            timeBody.innerHTML = timeEntries.length ? timeEntries.slice(0, 15).map(t => `
+                <tr>
+                    <td>${t.work_order_id || '-'}</td>
+                    <td>${t.hours || 0}</td>
+                    <td>${formatDate(t.start_time)}</td>
+                    <td>${formatDate(t.end_time)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4" class="empty-state">No time entries found</td></tr>';
+
+            const invBody = document.getElementById('vendorInvoices');
+            invBody.innerHTML = invoices.length ? invoices.slice(0, 15).map(i => `
+                <tr>
+                    <td><strong>${i.invoice_number}</strong></td>
+                    <td>${formatDate(i.invoice_date)}</td>
+                    <td>${formatCurrency(i.amount, i.currency || 'USD')}</td>
+                    <td>${statusBadge(i.status)}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="4" class="empty-state">No invoices found</td></tr>';
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    loadVendorPortal();
+</script>
+{% endblock %}

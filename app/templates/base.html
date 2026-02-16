@@ -39,6 +39,25 @@
             </div>
 
             <nav class="sidebar-nav">
+                {% set role_name = role.role_name if role else '' %}
+                {% if role_name in ['tenant', 'owner', 'vendor'] %}
+                <div class="nav-section">
+                    <div class="nav-section-title">Portal</div>
+                    {% if role_name == 'tenant' %}
+                    <a href="/portal/tenant" class="nav-item {% if active_page == 'tenant-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-house-user"></i></span><span>Tenant Portal</span>
+                    </a>
+                    {% elif role_name == 'owner' %}
+                    <a href="/portal/owner" class="nav-item {% if active_page == 'owner-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-building-user"></i></span><span>Owner Portal</span>
+                    </a>
+                    {% elif role_name == 'vendor' %}
+                    <a href="/portal/vendor" class="nav-item {% if active_page == 'vendor-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-toolbox"></i></span><span>Vendor Portal</span>
+                    </a>
+                    {% endif %}
+                </div>
+                {% else %}
                 <div class="nav-section">
                     <div class="nav-section-title">Main</div>
                     <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
@@ -99,6 +118,18 @@
                         <span class="icon"><i class="fa-solid fa-chart-pie"></i></span><span>Reports</span>
                     </a>
                 </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Portals</div>
+                    <a href="/portal/tenant" class="nav-item {% if active_page == 'tenant-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-house-user"></i></span><span>Tenant Portal</span>
+                    </a>
+                    <a href="/portal/owner" class="nav-item {% if active_page == 'owner-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-building-user"></i></span><span>Owner Portal</span>
+                    </a>
+                    <a href="/portal/vendor" class="nav-item {% if active_page == 'vendor-portal' %}active{% endif %}">
+                        <span class="icon"><i class="fa-solid fa-toolbox"></i></span><span>Vendor Portal</span>
+                    </a>
+                </div>
 
                 {% if role.id == 1 %}
                 <div class="nav-section">
@@ -119,6 +150,7 @@
                         <span class="icon"><i class="fa-solid fa-clock"></i></span><span>Job Scheduler</span>
                     </a>
                 </div>
+                {% endif %}
                 {% endif %}
             </nav>
 

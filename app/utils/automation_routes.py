@@ -4,12 +4,16 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.utils.lease_service import detect_expiring_leases, renew_lease, auto_terminate_expired
 from app.utils.billing_service import generate_invoices_for_today, apply_late_fees
 
-router = APIRouter(prefix="/api/automation", tags=["Automation"])
+router = APIRouter(
+    prefix="/api/automation",
+    tags=["Automation"],
+    dependencies=[Depends(require_permissions(["automation", "workflow"]))],
+)
 
 
 @router.get("/expiring-leases")

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func as sqlfunc
 from typing import Optional
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.billing.models import (
     Invoice, InvoiceLine, Payment, PaymentAllocation,
@@ -13,7 +13,11 @@ from app.modules.billing.models import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/billing", tags=["Billing"])
+router = APIRouter(
+    prefix="/api/billing",
+    tags=["Billing"],
+    dependencies=[Depends(require_permissions(["billing", "payments", "finance", "accounting"]))],
+)
 
 
 # ─── Invoices ───

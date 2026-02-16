@@ -5,14 +5,18 @@ from typing import List, Optional, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.workflow.models import (
     WorkflowDefinition, WorkflowExecutionLog, JobSchedule, JobExecutionLog
 )
 from app.utils.scheduler_service import scheduler
 
-router = APIRouter(prefix="/api/workflow", tags=["Workflow"])
+router = APIRouter(
+    prefix="/api/workflow",
+    tags=["Workflow"],
+    dependencies=[Depends(require_permissions(["workflow", "automation"]))],
+)
 
 class JobCreate(BaseModel):
     job_name: str

@@ -7,13 +7,17 @@ from typing import Optional
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.leasing.models import Lease, RentSchedule, SecurityDeposit, LeaseUnitLink
 from app.modules.properties.models import Unit
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/leases", tags=["Leasing"])
+router = APIRouter(
+    prefix="/api/leases",
+    tags=["Leasing"],
+    dependencies=[Depends(require_permissions(["leases", "portfolio"]))],
+)
 
 
 @router.get("")

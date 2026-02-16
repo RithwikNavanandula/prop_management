@@ -4,13 +4,17 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.compliance.models import (
     ComplianceRequirement, Document, DocumentType, Inspection, ComplianceItem
 )
 
-router = APIRouter(prefix="/api/compliance", tags=["Compliance"])
+router = APIRouter(
+    prefix="/api/compliance",
+    tags=["Compliance"],
+    dependencies=[Depends(require_permissions(["compliance", "portfolio"]))],
+)
 
 
 # --- Requirements ---

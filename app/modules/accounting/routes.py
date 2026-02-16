@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.accounting.models import (
     ChartOfAccount, JournalEntry, JournalEntryLine,
@@ -15,7 +15,11 @@ from app.modules.accounting.models import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/accounting", tags=["Accounting"])
+router = APIRouter(
+    prefix="/api/accounting",
+    tags=["Accounting"],
+    dependencies=[Depends(require_permissions(["accounting", "finance", "billing"]))],
+)
 
 
 def _tenant_q(q, model, user):

@@ -5,13 +5,17 @@ from sqlalchemy import or_
 from typing import List, Optional
 from datetime import datetime
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.crm.models import (
     Contact, CommunicationThread, Message, Task
 )
 
-router = APIRouter(prefix="/api/crm", tags=["CRM"])
+router = APIRouter(
+    prefix="/api/crm",
+    tags=["CRM"],
+    dependencies=[Depends(require_permissions(["crm", "sales", "marketing"]))],
+)
 
 
 # --- Contacts ---

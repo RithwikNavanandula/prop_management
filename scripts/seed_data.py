@@ -12,6 +12,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.database import Base, engine, SessionLocal
 from app.auth.dependencies import hash_password
 from app.auth.models import Role, UserAccount
+# Import model modules so all SQLAlchemy tables are registered for FK resolution.
+from app.modules.leasing import models as _leasing_models
+from app.modules.billing import models as _billing_models
+from app.modules.accounting import models as _accounting_models
+from app.modules.maintenance import models as _maintenance_models
+from app.modules.crm import models as _crm_models
+from app.modules.marketing import models as _marketing_models
+from app.modules.compliance import models as _compliance_models
+from app.modules.workflow import models as _workflow_models
+from app.modules.utilities import models as _utilities_models
 from app.modules.properties.models import (
     TenantOrg,
     Region,
@@ -22,6 +32,14 @@ from app.modules.properties.models import (
     Owner,
     Tenant,
     Vendor,
+)
+from app.modules.system.models import (
+    Country,
+    Currency,
+    OrgSettings,
+    TaxCode,
+    TaxRate,
+    PaymentProvider,
 )
 
 
@@ -40,17 +58,99 @@ def get_or_create(db, model, defaults=None, **filters):
 def seed_roles(db):
     roles = [
         (1, "admin", "Full system access", {"all": True}),
-        (2, "manager", "Property manager", {"properties": True, "leases": True}),
-        (3, "owner", "Owner portal", {"portfolio": True}),
-        (4, "tenant", "Tenant portal", {"lease": True, "payments": True}),
-        (5, "vendor", "Vendor portal", {"work_orders": True}),
-        (6, "accountant", "Finance portal", {"billing": True, "accounting": True}),
+        (
+            2,
+            "manager",
+            "Property manager",
+            {
+                "properties": True,
+                "leases": True,
+                "maintenance": True,
+                "work_orders": True,
+                "billing": True,
+                "payments": True,
+                "tenants": True,
+                "owners": True,
+                "vendors": True,
+                "utilities": True,
+                "dashboard": True,
+                "reports": True,
+                "export": True,
+                "crm": True,
+                "marketing": True,
+                "compliance": True,
+                "workflow": True,
+                "automation": True,
+                "portfolio": True,
+            },
+        ),
+        (3, "owner", "Owner portal", {"portfolio": True, "reports": True}),
+        (4, "tenant", "Tenant portal", {"lease": True, "payments": True, "maintenance": True}),
+        (5, "vendor", "Vendor portal", {"work_orders": True, "maintenance": True}),
+        (6, "accountant", "Finance portal", {"billing": True, "accounting": True, "reports": True, "export": True}),
+        (7, "support", "Support admin", {"users": True, "system": True, "reports": True}),
     ]
     for role_id, role_name, desc, perms in roles:
         role = db.query(Role).filter(Role.id == role_id).first()
         if role:
+            current_perms = role.permissions if isinstance(role.permissions, dict) else {}
+            role.permissions = {**perms, **current_perms}
+            role.role_name = role.role_name or role_name
+            role.description = role.description or desc
+            role.is_system = True
+            if role.is_active is None:
+                role.is_active = True
             continue
         db.add(Role(id=role_id, role_name=role_name, description=desc, permissions=perms, is_system=True))
+    db.flush()
+
+
+def seed_countries(db):
+    countries = [
+        ("US", "United States", "USA", "USD", "America/New_York", "+1"),
+        ("GB", "United Kingdom", "GBR", "GBP", "Europe/London", "+44"),
+        ("AE", "United Arab Emirates", "ARE", "AED", "Asia/Dubai", "+971"),
+        ("IN", "India", "IND", "INR", "Asia/Kolkata", "+91"),
+        ("SG", "Singapore", "SGP", "SGD", "Asia/Singapore", "+65"),
+    ]
+    for code, name, iso3, currency, tz, phone in countries:
+        get_or_create(
+            db,
+            Country,
+            country_code=code,
+            defaults={
+                "country_name": name,
+                "iso3": iso3,
+                "default_currency_code": currency,
+                "default_timezone": tz,
+                "phone_code": phone,
+                "is_active": True,
+            },
+        )
+    db.flush()
+
+
+def seed_currencies(db):
+    currencies = [
+        ("USD", "US Dollar", "$", 2),
+        ("GBP", "British Pound", "£", 2),
+        ("AED", "UAE Dirham", "AED", 2),
+        ("INR", "Indian Rupee", "₹", 2),
+        ("SGD", "Singapore Dollar", "S$", 2),
+        ("EUR", "Euro", "€", 2),
+    ]
+    for code, name, symbol, minor in currencies:
+        get_or_create(
+            db,
+            Currency,
+            currency_code=code,
+            defaults={
+                "currency_name": name,
+                "symbol": symbol,
+                "minor_units": minor,
+                "is_active": True,
+            },
+        )
     db.flush()
 
 
@@ -96,6 +196,72 @@ def seed_users(db, org_id):
             if not user.password_hash:
                 user.password_hash = hash_password(user_data["password"])
 
+    db.flush()
+
+
+def seed_org_settings(db, org_id):
+    settings, _ = get_or_create(
+        db,
+        OrgSettings,
+        tenant_org_id=org_id,
+        defaults={
+            "base_currency": "USD",
+            "country_code": "US",
+            "timezone": "America/New_York",
+            "locale": "en-US",
+            "fiscal_year_start_month": 1,
+            "tax_inclusive": False,
+        },
+    )
+    db.flush()
+    return settings
+
+
+def seed_tax_codes(db, org_id):
+    tax_codes = [
+        ("US-SALES", "US Sales Tax", "US", "Sales"),
+        ("GB-VAT", "UK VAT", "GB", "VAT"),
+    ]
+    for code, name, country_code, tax_type in tax_codes:
+        tc, _ = get_or_create(
+            db,
+            TaxCode,
+            tenant_org_id=org_id,
+            code=code,
+            defaults={
+                "name": name,
+                "country_code": country_code,
+                "tax_type": tax_type,
+                "is_compound": False,
+                "is_active": True,
+            },
+        )
+        get_or_create(
+            db,
+            TaxRate,
+            tax_code_id=tc.id,
+            defaults={
+                "country_code": country_code,
+                "region_code": None,
+                "rate_percent": 10.000 if country_code == "GB" else 8.250,
+                "is_active": True,
+            },
+        )
+    db.flush()
+
+
+def seed_payment_providers(db, org_id):
+    get_or_create(
+        db,
+        PaymentProvider,
+        tenant_org_id=org_id,
+        provider_name="stripe",
+        defaults={
+            "environment": "test",
+            "is_active": True,
+            "settings_json": {"mode": "test", "webhook_secret": ""},
+        },
+    )
     db.flush()
 
 
@@ -293,6 +459,8 @@ def seed():
 
     try:
         seed_roles(db)
+        seed_countries(db)
+        seed_currencies(db)
 
         org, _ = get_or_create(
             db,
@@ -306,9 +474,12 @@ def seed():
             },
         )
 
+        seed_org_settings(db, org.id)
         seed_users(db, org.id)
         seed_properties(db, org)
         seed_parties(db, org.id)
+        seed_tax_codes(db, org.id)
+        seed_payment_providers(db, org.id)
 
         db.commit()
 

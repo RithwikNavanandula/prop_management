@@ -4,11 +4,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.utilities.models import UtilityReading
 
-router = APIRouter(prefix="/api/utilities", tags=["Utilities"])
+router = APIRouter(
+    prefix="/api/utilities",
+    tags=["Utilities"],
+    dependencies=[Depends(require_permissions(["utilities", "properties"]))],
+)
 
 
 def _reading_dict(r):

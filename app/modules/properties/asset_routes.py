@@ -5,11 +5,15 @@ from sqlalchemy import or_
 from typing import Optional
 from datetime import datetime
 from app.database import get_db
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.properties.models import Asset
 
-router = APIRouter(prefix="/api/assets", tags=["Assets"])
+router = APIRouter(
+    prefix="/api/assets",
+    tags=["Assets"],
+    dependencies=[Depends(require_permissions(["properties", "portfolio"]))],
+)
 
 
 def _asset_dict(a):

@@ -6,7 +6,14 @@ from datetime import datetime
 from app.database import get_db
 from app.auth.models import UserAccount, Role
 from app.auth.schemas import LoginRequest, TokenResponse, UserCreate, UserResponse, UserUpdate
-from app.auth.dependencies import hash_password, verify_password, create_access_token, get_current_user
+from app.auth.dependencies import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    get_current_user_from_token,
+    require_permissions,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -37,7 +44,14 @@ def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-def register(req: UserCreate, db: Session = Depends(get_db)):
+def register(
+    req: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: UserAccount | None = Depends(get_current_user_from_token),
+):
+    # Allow open registration only for initial bootstrap.
+    if db.query(UserAccount).count() > 0 and (not current_user or current_user.role_id != 1):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
     if db.query(UserAccount).filter((UserAccount.username == req.username) | (UserAccount.email == req.email)).first():
         raise HTTPException(status_code=409, detail="Username or email already exists")
     user = UserAccount(
@@ -87,10 +101,10 @@ def logout_get(response: Response):
 
 
 @router.get("/users", response_model=list[UserResponse])
-def list_users(db: Session = Depends(get_db), current_user: UserAccount = Depends(get_current_user)):
-    # Simple role check for admin (assuming role_id 1 is admin)
-    if current_user.role_id != 1:
-        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(require_permissions(["admin", "users"])),
+):
     users = db.query(UserAccount).all()
     results = []
     for user in users:
@@ -107,9 +121,12 @@ def list_users(db: Session = Depends(get_db), current_user: UserAccount = Depend
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, req: UserUpdate, db: Session = Depends(get_db), current_user: UserAccount = Depends(get_current_user)):
-    if current_user.role_id != 1:
-        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+def update_user(
+    user_id: int,
+    req: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(require_permissions(["admin", "users"])),
+):
     user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -132,9 +149,11 @@ def update_user(user_id: int, req: UserUpdate, db: Session = Depends(get_db), cu
 
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: UserAccount = Depends(get_current_user)):
-    if current_user.role_id != 1:
-        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(require_permissions(["admin", "users"])),
+):
     user = db.query(UserAccount).filter(UserAccount.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -146,6 +165,9 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: UserA
 
 
 @router.get("/roles")
-def list_roles(db: Session = Depends(get_db), current_user: UserAccount = Depends(get_current_user)):
+def list_roles(
+    db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(require_permissions(["admin", "users", "system"])),
+):
     roles = db.query(Role).all()
     return [{"id": r.id, "role_name": r.role_name, "description": r.description, "permissions": r.permissions} for r in roles]
