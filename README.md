@@ -36,3 +36,29 @@ Default admin:
 ```bash
 python scripts/ui_regression_check.py
 ```
+
+## Deploy to Fly.io
+1. Install and login:
+```bash
+fly auth login
+```
+2. Create app (first time only) and keep the generated app name in `fly.toml`:
+```bash
+fly launch --no-deploy
+```
+3. Create a persistent volume for SQLite/uploads:
+```bash
+fly volumes create propman_data --region ord --size 10
+```
+4. Set production secret:
+```bash
+fly secrets set SECRET_KEY="replace-with-a-long-random-secret"
+```
+5. Deploy:
+```bash
+fly deploy
+```
+
+Notes:
+- `fly.toml` is configured to use SQLite at `/data/property_mgmt.db` and uploads at `/data/uploads` via mounted volume.
+- Update `app = "prop-management-v2"` in `fly.toml` if that Fly app name is already taken.

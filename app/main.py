@@ -190,15 +190,19 @@ app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=li
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+UPLOAD_DIR = settings.UPLOAD_DIR
+if not os.path.isabs(UPLOAD_DIR):
+    UPLOAD_DIR = os.path.join(BASE_DIR, "..", UPLOAD_DIR)
+UPLOAD_DIR = os.path.abspath(UPLOAD_DIR)
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(os.path.join(STATIC_DIR, "css"), exist_ok=True)
 os.makedirs(os.path.join(STATIC_DIR, "js"), exist_ok=True)
 os.makedirs(os.path.join(STATIC_DIR, "img"), exist_ok=True)
 os.makedirs(os.path.join(STATIC_DIR, "qrcodes"), exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, "..", "uploads"), exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-app.mount("/uploads", StaticFiles(directory=os.path.join(BASE_DIR, "..", "uploads")), name="uploads")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # Register Middleware

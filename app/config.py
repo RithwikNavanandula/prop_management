@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     QR_CODE_DIR: str = "static/qrcodes"
     APP_NAME: str = "PropManager Pro"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # SMTP Settings
     SMTP_SERVER: str = "smtp.gmail.com"
