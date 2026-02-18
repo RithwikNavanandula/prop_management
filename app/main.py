@@ -255,6 +255,11 @@ async def login_page(request: Request):
     return templates.TemplateResponse("auth/login.html", {"request": request, "settings": settings})
 
 
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("auth/register.html", {"request": request, "settings": settings})
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
                           db: Session = Depends(get_db)):

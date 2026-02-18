@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - {{ settings.APP_NAME }}</title>
+    <meta name="description" content="Create an account for Property Management Software">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        (function () {
+            const theme = localStorage.getItem('app-theme') || 'light-cloud';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+</head>
+
+<body class="login-page">
+    <div class="login-shell">
+        <section class="login-brand-panel">
+            <div>
+                <h1 class="brand-title">Create a new user account.</h1>
+                <p class="brand-subtitle">
+                    Use this form for first-time setup or admin-created users.
+                </p>
+                <div class="login-metrics">
+                    <div class="metric">
+                        <div class="label">Bootstrap</div>
+                        <div class="value">First User</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Roles</div>
+                        <div class="value">Role Based Access</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Access</div>
+                        <div class="value">Admin Controlled</div>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.78rem; color:rgba(226,232,240,0.7)">PropManager Pro v2 frontend</p>
+        </section>
+
+        <section class="login-panel">
+            <div class="login-card animate-in">
+                <div class="logo-section">
+                    <div class="logo-icon">PM</div>
+                    <h2>{{ settings.APP_NAME }}</h2>
+                    <p class="subtitle">Create Account</p>
+                </div>
+
+                <div id="registerError" class="login-error"></div>
+                <div id="registerSuccess" class="login-error"
+                    style="display:none;background:#ecfdf3;color:#166534;border:1px solid #86efac"></div>
+
+                <form id="registerForm" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" id="full_name" class="form-control" placeholder="Enter full name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" id="username" class="form-control" placeholder="Choose a username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="email" class="form-control" placeholder="Enter email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="Create password" required minlength="8">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" id="confirm_password" class="form-control" placeholder="Repeat password" required minlength="8">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select id="role_id" class="form-control">
+                            <option value="2">Manager</option>
+                            <option value="1">Admin</option>
+                            <option value="3">Owner</option>
+                            <option value="4">Tenant</option>
+                            <option value="5">Vendor</option>
+                            <option value="6">Accountant</option>
+                            <option value="7">Support</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="registerBtn">Create Account</button>
+                </form>
+
+                <p class="login-help">Already have an account? <a href="/login">Sign in</a></p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        async function handleRegister(e) {
+            e.preventDefault();
+            const form = document.getElementById('registerForm');
+            if (!form.reportValidity()) return;
+
+            const btn = document.getElementById('registerBtn');
+            const errDiv = document.getElementById('registerError');
+            const okDiv = document.getElementById('registerSuccess');
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            errDiv.style.display = 'none';
+            okDiv.style.display = 'none';
+            if (password !== confirmPassword) {
+                errDiv.textContent = 'Passwords do not match';
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            btn.textContent = 'Creating account...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value.trim(),
+                        email: document.getElementById('email').value.trim(),
+                        password,
+                        full_name: document.getElementById('full_name').value.trim() || null,
+                        role_id: parseInt(document.getElementById('role_id').value, 10),
+                    }),
+                });
+
+                const data = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Registration failed');
+                }
+                okDiv.textContent = 'Account created successfully. Redirecting to login...';
+                okDiv.style.display = 'block';
+                setTimeout(() => { window.location.href = '/login'; }, 1000);
+            } catch (err) {
+                errDiv.textContent = err.message;
+                errDiv.style.display = 'block';
+                btn.textContent = 'Create Account';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>
