@@ -186,8 +186,6 @@
     let allAssets = [];
     let searchTimer;
 
-    function openModal(id) { document.getElementById(id).classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
     function debounceSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(loadAssets, 300); }
 
     function openAddModal() {

@@ -172,11 +172,12 @@
         if (type) url += `utility_type=${type}&`;
         if (status) url += `status=${status}&`;
 
+        setTableState('readingsTable', 9, 'Loading utility readings...');
         try {
             const data = await apiFetch(url);
             const tbody = document.getElementById('readingsTable');
             if (!data.items.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No utility readings found</td></tr>';
+                setTableState('readingsTable', 9, 'No utility readings found');
                 updateStats([]);
                 return;
             }
@@ -197,7 +198,10 @@
                     </td>
                 </tr>
             `).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            setTableState('readingsTable', 9, 'Could not load utility readings');
+            showToast(e.message || 'Failed to load utility readings', 'error');
+        }
     }
 
     function getTypeColor(type) {

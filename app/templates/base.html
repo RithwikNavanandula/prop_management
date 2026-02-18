@@ -274,6 +274,24 @@
             return `<span class="badge badge-${map[status] || 'neutral'}">${status || '-'}</span>`;
         }
 
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.add('active');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('active');
+        }
+
+        function setTableState(tbodyId, colspan, message) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            tbody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">${message}</td></tr>`;
+        }
+
         function exportCurrentScreen() {
             const injectedActivePage = {{ active_page|default('', true)|tojson }};
             let page = injectedActivePage;
@@ -351,12 +369,24 @@
             });
 
             document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    const activeModal = document.querySelector('.modal-backdrop.active');
+                    if (activeModal) {
+                        activeModal.classList.remove('active');
+                    }
+                }
                 if (event.key === '/' && document.activeElement !== globalSearch) {
                     const targetTag = document.activeElement?.tagName;
                     if (targetTag !== 'INPUT' && targetTag !== 'TEXTAREA') {
                         event.preventDefault();
                         globalSearch?.focus();
                     }
+                }
+            });
+
+            document.addEventListener('click', (event) => {
+                if (event.target.classList?.contains('modal-backdrop')) {
+                    event.target.classList.remove('active');
                 }
             });
         })();

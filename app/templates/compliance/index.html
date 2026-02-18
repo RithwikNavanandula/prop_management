@@ -12,6 +12,10 @@
 
 <!-- Requirements Tab -->
 <div id="requirements" class="tab-content" style="display:block;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h4 style="margin:0">Compliance Requirements</h4>
+        <button class="btn btn-primary" onclick="openNewReq()">+ Add Requirement</button>
+    </div>
     <div class="card">
         <table class="data-table">
             <thead>
@@ -20,34 +24,50 @@
                     <th>Entity Type</th>
                     <th>Frequency</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="reqTable"></tbody>
+            <tbody id="reqTable">
+                <tr>
+                    <td colspan="5">Loading...</td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
 
 <!-- Documents Tab -->
 <div id="documents" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h4 style="margin:0">Documents</h4>
+        <button class="btn btn-primary" onclick="openNewDoc()">+ Add Document</button>
+    </div>
     <div class="card">
         <table class="data-table">
             <thead>
                 <tr>
                     <th>File Name</th>
                     <th>Type</th>
+                    <th>Owner</th>
                     <th>Expiry Date</th>
                     <th>Signed</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="docTable"></tbody>
+            <tbody id="docTable">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
 
 <!-- Inspections Tab -->
 <div id="inspections" class="tab-content">
-    <div class="actions-bar">
-        <button class="btn btn-primary" onclick="openModal('addInspectionModal')">Schedule Inspection</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h4 style="margin:0">Inspections</h4>
+        <button class="btn btn-primary" onclick="openNewInsp()">+ Schedule Inspection</button>
     </div>
     <div class="card">
         <table class="data-table">
@@ -58,78 +78,286 @@
                     <th>Scheduled Date</th>
                     <th>Inspector</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="inspTable"></tbody>
+            <tbody id="inspTable">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
 
+<!-- Add Requirement Modal -->
+<div class="modal-backdrop" id="reqModal">
+    <div class="modal" style="max-width:550px">
+        <div class="modal-header">
+            <h3>Add Requirement</h3><button class="modal-close" onclick="closeModal('reqModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="reqForm">
+                <div class="form-group"><label class="form-label">Requirement Name*</label>
+                    <input class="form-control" name="requirement_name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Entity Type</label>
+                        <select class="form-control" name="entity_type">
+                            <option value="">Select</option>
+                            <option>Property</option>
+                            <option>Unit</option>
+                            <option>Tenant</option>
+                            <option>Vendor</option>
+                            <option>Staff</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Frequency</label>
+                        <select class="form-control" name="frequency">
+                            <option value="">Select</option>
+                            <option>Monthly</option>
+                            <option>Quarterly</option>
+                            <option>Semi-Annual</option>
+                            <option>Annual</option>
+                            <option>One-Time</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('reqModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveReq()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Document Modal -->
+<div class="modal-backdrop" id="docModal">
+    <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+            <h3>Add Document</h3><button class="modal-close" onclick="closeModal('docModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="docForm">
+                <div class="form-group"><label class="form-label">File Name*</label>
+                    <input class="form-control" name="file_name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Owner Entity Type*</label>
+                        <select class="form-control" name="owner_entity_type" required>
+                            <option>Property</option>
+                            <option>Unit</option>
+                            <option>Tenant</option>
+                            <option>Vendor</option>
+                            <option>Staff</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Owner Entity ID*</label>
+                        <input class="form-control" name="owner_entity_id" type="number" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Document Type ID</label>
+                        <input class="form-control" name="document_type_id" type="number">
+                    </div>
+                    <div class="form-group"><label class="form-label">Expiry Date</label>
+                        <input class="form-control" name="expiry_date" type="date">
+                    </div>
+                </div>
+                <div class="form-group"><label class="form-label">File Path</label>
+                    <input class="form-control" name="file_path" placeholder="/uploads/...">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('docModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveDoc()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Inspection Modal -->
+<div class="modal-backdrop" id="inspModal">
+    <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+            <h3>Schedule Inspection</h3><button class="modal-close" onclick="closeModal('inspModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="inspForm">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Inspection Type</label>
+                        <select class="form-control" name="inspection_type">
+                            <option>Routine</option>
+                            <option>Move-In</option>
+                            <option>Move-Out</option>
+                            <option>Safety</option>
+                            <option>Emergency</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Scheduled Date*</label>
+                        <input class="form-control" name="scheduled_date" type="date" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Property ID</label>
+                        <input class="form-control" name="property_id" type="number">
+                    </div>
+                    <div class="form-group"><label class="form-label">Unit ID</label>
+                        <input class="form-control" name="unit_id" type="number">
+                    </div>
+                </div>
+                <div class="form-group"><label class="form-label">Inspector ID</label>
+                    <input class="form-control" name="inspector_id" type="number">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('inspModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveInsp()">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
-        tablinks = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
         if (tabName === 'requirements') loadReqs();
         if (tabName === 'documents') loadDocs();
         if (tabName === 'inspections') loadInsp();
     }
 
+    /* ---------- Requirements ---------- */
+    function openNewReq() { document.getElementById('reqForm').reset(); openModal('reqModal'); }
+
     async function loadReqs() {
-        const resp = await fetch('/api/compliance/requirements');
-        const data = await resp.json();
-        const tbody = document.getElementById('reqTable');
-        tbody.innerHTML = '';
-        data.items.forEach(r => {
-            tbody.innerHTML += `
+        setTableState('reqTable', 5, 'Loading requirements...');
+        try {
+            const data = await apiFetch('/api/compliance/requirements');
+            const tbody = document.getElementById('reqTable');
+            if (!data.items || !data.items.length) {
+                setTableState('reqTable', 5, 'No requirements found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(r => `
                 <tr>
-                    <td>${r.requirement_name}</td>
+                    <td><strong>${r.requirement_name}</strong></td>
                     <td>${r.entity_type || '-'}</td>
                     <td>${r.frequency || '-'}</td>
-                    <td>${r.is_active ? 'Active' : 'Inactive'}</td>
+                    <td><span class="badge badge-${r.is_active ? 'success' : 'secondary'}">${r.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td><button class="btn btn-sm btn-danger" onclick="deleteReq(${r.id})">🗑️</button></td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (e) {
+            setTableState('reqTable', 5, 'Could not load requirements');
+            showToast(e.message || 'Failed to load requirements', 'error');
+        }
     }
 
+    async function saveReq() {
+        const d = {}; new FormData(document.getElementById('reqForm')).forEach((v, k) => { if (v) d[k] = v; });
+        try {
+            await apiFetch('/api/compliance/requirements', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('reqModal'); showToast('Requirement added'); loadReqs();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteReq(id) {
+        if (!confirm('Delete this requirement?')) return;
+        try { await apiFetch(`/api/compliance/requirements/${id}`, { method: 'DELETE' }); showToast('Deleted'); loadReqs(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    /* ---------- Documents ---------- */
+    function openNewDoc() { document.getElementById('docForm').reset(); openModal('docModal'); }
+
     async function loadDocs() {
-        const resp = await fetch('/api/compliance/documents');
-        const data = await resp.json();
-        const tbody = document.getElementById('docTable');
-        tbody.innerHTML = '';
-        data.items.forEach(d => {
-            tbody.innerHTML += `
+        setTableState('docTable', 6, 'Loading documents...');
+        try {
+            const data = await apiFetch('/api/compliance/documents');
+            const tbody = document.getElementById('docTable');
+            if (!data.items || !data.items.length) {
+                setTableState('docTable', 6, 'No documents found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(d => `
                 <tr>
                     <td>${d.file_name}</td>
                     <td>${d.document_type_id || '-'}</td>
+                    <td>${d.owner_entity_type} #${d.owner_entity_id}</td>
                     <td>${d.expiry_date || '-'}</td>
-                    <td>${d.is_signed ? 'Yes' : 'No'}</td>
+                    <td>${d.is_signed ? '✅ Yes' : '❌ No'}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="deleteDoc(${d.id})">🗑️</button></td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (e) {
+            setTableState('docTable', 6, 'Could not load documents');
+            showToast(e.message || 'Failed to load documents', 'error');
+        }
     }
 
+    async function saveDoc() {
+        const d = {}; new FormData(document.getElementById('docForm')).forEach((v, k) => { if (v) d[k] = v; });
+        if (d.owner_entity_id) d.owner_entity_id = parseInt(d.owner_entity_id);
+        if (d.document_type_id) d.document_type_id = parseInt(d.document_type_id);
+        try {
+            await apiFetch('/api/compliance/documents', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('docModal'); showToast('Document added'); loadDocs();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteDoc(id) {
+        if (!confirm('Delete this document?')) return;
+        try { await apiFetch(`/api/compliance/documents/${id}`, { method: 'DELETE' }); showToast('Deleted'); loadDocs(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    /* ---------- Inspections ---------- */
+    function openNewInsp() { document.getElementById('inspForm').reset(); openModal('inspModal'); }
+
     async function loadInsp() {
-        const resp = await fetch('/api/compliance/inspections');
-        const data = await resp.json();
-        const tbody = document.getElementById('inspTable');
-        tbody.innerHTML = '';
-        data.items.forEach(i => {
-            tbody.innerHTML += `
+        setTableState('inspTable', 6, 'Loading inspections...');
+        try {
+            const data = await apiFetch('/api/compliance/inspections');
+            const tbody = document.getElementById('inspTable');
+            if (!data.items || !data.items.length) {
+                setTableState('inspTable', 6, 'No inspections found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(i => `
                 <tr>
                     <td>${i.inspection_type}</td>
                     <td>${i.unit_id ? 'Unit #' + i.unit_id : (i.property_id ? 'Prop #' + i.property_id : '-')}</td>
                     <td>${i.scheduled_date || '-'}</td>
                     <td>${i.inspector_id || '-'}</td>
-                    <td>${i.status}</td>
+                    <td><span class="badge badge-${i.status === 'Completed' ? 'success' : i.status === 'Scheduled' ? 'info' : 'warning'}">${i.status}</span></td>
+                    <td><button class="btn btn-sm btn-danger" onclick="deleteInsp(${i.id})">🗑️</button></td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (e) {
+            setTableState('inspTable', 6, 'Could not load inspections');
+            showToast(e.message || 'Failed to load inspections', 'error');
+        }
+    }
+
+    async function saveInsp() {
+        const d = {}; new FormData(document.getElementById('inspForm')).forEach((v, k) => { if (v) d[k] = v; });
+        ['property_id', 'unit_id', 'inspector_id'].forEach(k => { if (d[k]) d[k] = parseInt(d[k]); });
+        try {
+            await apiFetch('/api/compliance/inspections', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('inspModal'); showToast('Inspection scheduled'); loadInsp();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteInsp(id) {
+        if (!confirm('Delete this inspection?')) return;
+        try { await apiFetch(`/api/compliance/inspections/${id}`, { method: 'DELETE' }); showToast('Deleted'); loadInsp(); }
+        catch (e) { showToast(e.message, 'error'); }
     }
 
     // Initial load

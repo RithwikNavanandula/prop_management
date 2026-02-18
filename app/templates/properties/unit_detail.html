@@ -359,8 +359,6 @@
         const propId = parseInt(bridge.propId);
         const unitId = parseInt(bridge.unitId);
 
-        function openModal(id) { document.getElementById(id).classList.add('active') }
-        function closeModal(id) { document.getElementById(id).classList.remove('active') }
         function switchTab(name, el) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); el.classList.add('active');
             ['assets', 'leases', 'maintenance', 'details'].forEach(t => {

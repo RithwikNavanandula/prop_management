@@ -57,9 +57,35 @@ def get_reading(reading_id: int, db: Session = Depends(get_db), user: UserAccoun
     return _reading_dict(r)
 
 
+def _sanitize_reading_data(data: dict) -> dict:
+    """Coerce frontend form values to correct types for UtilityReading."""
+    clean = {}
+    int_fields = {"property_id", "unit_id", "invoice_id"}
+    float_fields = {"previous_reading", "current_reading", "usage", "rate_per_unit", "total_cost"}
+    for k, v in data.items():
+        if not hasattr(UtilityReading, k) or k in ("id", "created_at"):
+            continue
+        if v == "" or v is None:
+            clean[k] = None
+        elif k in int_fields:
+            try:
+                clean[k] = int(v)
+            except (ValueError, TypeError):
+                clean[k] = None
+        elif k in float_fields:
+            try:
+                clean[k] = float(v)
+            except (ValueError, TypeError):
+                clean[k] = 0
+        else:
+            clean[k] = v
+    return clean
+
+
 @router.post("", status_code=201)
 def create_reading(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    r = UtilityReading(**{k: v for k, v in data.items() if hasattr(UtilityReading, k)})
+    clean = _sanitize_reading_data(data)
+    r = UtilityReading(**clean)
     if user.tenant_org_id:
         r.tenant_org_id = user.tenant_org_id
     # Auto-calculate usage and total_cost
@@ -78,9 +104,9 @@ def update_reading(reading_id: int, data: dict, db: Session = Depends(get_db), u
     r = db.query(UtilityReading).filter(UtilityReading.id == reading_id).first()
     if not r:
         raise HTTPException(404, "Reading not found")
-    for k, v in data.items():
-        if hasattr(r, k) and k not in ("id", "created_at"):
-            setattr(r, k, v)
+    clean = _sanitize_reading_data(data)
+    for k, v in clean.items():
+        setattr(r, k, v)
     # Recalculate
     if r.current_reading and r.previous_reading:
         r.usage = float(r.current_reading) - float(r.previous_reading)

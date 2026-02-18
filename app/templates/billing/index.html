@@ -202,7 +202,9 @@
             const propData = await apiFetch('/api/properties?limit=200');
             document.getElementById('invPropSelect').innerHTML = '<option value="">Select Property</option>' +
                 (propData.items || []).map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            showToast(e.message || 'Failed to load tenant/property lookup', 'error');
+        }
     }
 
     function getTenantName(id) {
@@ -223,10 +225,14 @@
         await loadTenantsForLookup();
         const st = document.getElementById('invStatus').value;
         let url = '/api/billing/invoices?limit=100'; if (st) url += `&status=${st}`;
+        setTableState('invoicesTable', 7, 'Loading invoices...');
         try {
             const data = await apiFetch(url);
             const tb = document.getElementById('invoicesTable');
-            if (!data.items || !data.items.length) { tb.innerHTML = '<tr><td colspan="7" class="empty-state">No invoices</td></tr>'; return; }
+            if (!data.items || !data.items.length) {
+                setTableState('invoicesTable', 7, 'No invoices found');
+                return;
+            }
             tb.innerHTML = data.items.map(i => `<tr>
                 <td><strong>${i.invoice_number}</strong></td>
                 <td>${i.invoice_type || '-'}</td>
@@ -236,15 +242,22 @@
                 <td>${formatCurrency(i.total_amount || i.document_amount, i.document_currency || 'USD')}</td>
                 <td>${statusBadge(i.invoice_status || i.status || 'Draft')}</td>
             </tr>`).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            setTableState('invoicesTable', 7, 'Could not load invoices');
+            showToast(e.message || 'Failed to load invoices', 'error');
+        }
     }
 
     async function loadPayments() {
         await loadTenantsForLookup();
+        setTableState('paymentsTable', 6, 'Loading payments...');
         try {
             const data = await apiFetch('/api/billing/payments?limit=100');
             const tb = document.getElementById('paymentsTable');
-            if (!data.items || !data.items.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-state">No payments</td></tr>'; return; }
+            if (!data.items || !data.items.length) {
+                setTableState('paymentsTable', 6, 'No payments found');
+                return;
+            }
             tb.innerHTML = data.items.map(p => `<tr>
                 <td><strong>${p.payment_number}</strong></td>
                 <td>${getTenantName(p.tenant_id)}</td>
@@ -253,7 +266,10 @@
                 <td>${p.payment_method || p.payment_method_id || '-'}</td>
                 <td>${statusBadge(p.status || 'Completed')}</td>
             </tr>`).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            setTableState('paymentsTable', 6, 'Could not load payments');
+            showToast(e.message || 'Failed to load payments', 'error');
+        }
     }
 
     async function saveInvoice() {

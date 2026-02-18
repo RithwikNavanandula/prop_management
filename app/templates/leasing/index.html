@@ -206,27 +206,30 @@
     function closeModal(id) { document.getElementById(id).classList.remove('active') }
 
     async function loadSelectionData() {
-        // Load Properties
-        const props = await apiFetch('/api/properties?limit=100');
-        const pSelect = document.getElementById('leasePropertySelect');
-        pSelect.innerHTML = '<option value="">Select Property</option>' +
-            props.items.map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
+        try {
+            // Load Properties
+            const props = await apiFetch('/api/properties?limit=100');
+            const pSelect = document.getElementById('leasePropertySelect');
+            pSelect.innerHTML = '<option value="">Select Property</option>' +
+                props.items.map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
 
-        // Load Tenants
-        const tenants = await apiFetch('/api/tenants?limit=100');
-        const tSelect = document.getElementById('leaseTenantSelect');
-        tSelect.innerHTML = '<option value="">Select Tenant</option>' +
-            tenants.items.map(t => `<option value="${t.id}">${t.first_name} ${t.last_name || ''}</option>`).join('');
+            // Load Tenants
+            const tenants = await apiFetch('/api/tenants?limit=100');
+            const tSelect = document.getElementById('leaseTenantSelect');
+            tSelect.innerHTML = '<option value="">Select Tenant</option>' +
+                tenants.items.map(t => `<option value="${t.id}">${t.first_name} ${t.last_name || ''}</option>`).join('');
 
-
-        // Handle pre-filling from URL
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('prop_id')) {
-            setSelectValue('leasePropertySelect', params.get('prop_id'));
-            await loadUnitsForSelection();
-            if (params.has('unit_id')) {
-                setSelectValue('leaseUnitSelect', params.get('unit_id'));
+            // Handle pre-filling from URL
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('prop_id')) {
+                setSelectValue('leasePropertySelect', params.get('prop_id'));
+                await loadUnitsForSelection();
+                if (params.has('unit_id')) {
+                    setSelectValue('leaseUnitSelect', params.get('unit_id'));
+                }
             }
+        } catch (e) {
+            showToast(e.message || 'Failed to load lease selections', 'error');
         }
     }
 
@@ -237,9 +240,14 @@
             uSelect.innerHTML = '<option value="">Select Unit (Choose Property first)</option>';
             return;
         }
-        const units = await apiFetch(`/api/properties/${propId}/units`);
-        uSelect.innerHTML = '<option value="">Select Unit</option>' +
-            units.items.map(u => `<option value="${u.id}">${u.unit_number} (${u.current_status})</option>`).join('');
+        try {
+            const units = await apiFetch(`/api/properties/${propId}/units`);
+            uSelect.innerHTML = '<option value="">Select Unit</option>' +
+                units.items.map(u => `<option value="${u.id}">${u.unit_number} (${u.current_status})</option>`).join('');
+        } catch (e) {
+            uSelect.innerHTML = '<option value="">Could not load units</option>';
+            showToast(e.message || 'Failed to load units', 'error');
+        }
     }
 
     function setSelectValue(id, val) {
@@ -252,52 +260,65 @@
         const q = document.getElementById('searchInput').value;
         let url = '/api/leases?limit=100';
         if (st) url += `&status=${st}`; if (q) url += `&search=${encodeURIComponent(q)}`;
-        const data = await apiFetch(url);
-        const tb = document.getElementById('leasesTable');
-        if (!data.items.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state"><p>No leases found</p></td></tr>'; return; }
-        tb.innerHTML = data.items.map(l => `<tr>
-        <td><strong>${l.lease_number}</strong></td><td>${l.lease_type}</td>
-        <td>Property #${l.property_id}</td><td>Tenant #${l.tenant_id}</td>
-        <td>${formatDate(l.start_date)}</td><td>${formatDate(l.end_date)}</td>
-        <td>${formatCurrency(l.base_rent_amount, l.base_rent_currency || 'USD')}</td>
-        <td>${statusBadge(l.lease_status)}</td>
-        <td>
-            <div style="display:flex; gap:4px">
-                <button class="btn btn-sm btn-secondary" onclick="viewLease(${l.id})">View</button>
-                <button class="btn btn-sm btn-secondary" onclick="activateLease(${l.id})">Activate</button>
-            </div>
-        </td>
-    </tr>`).join('');
+        setTableState('leasesTable', 9, 'Loading leases...');
+        try {
+            const data = await apiFetch(url);
+            const tb = document.getElementById('leasesTable');
+            if (!data.items.length) {
+                setTableState('leasesTable', 9, 'No leases found');
+                return;
+            }
+            tb.innerHTML = data.items.map(l => `<tr>
+            <td><strong>${l.lease_number}</strong></td><td>${l.lease_type}</td>
+            <td>Property #${l.property_id}</td><td>Tenant #${l.tenant_id}</td>
+            <td>${formatDate(l.start_date)}</td><td>${formatDate(l.end_date)}</td>
+            <td>${formatCurrency(l.base_rent_amount, l.base_rent_currency || 'USD')}</td>
+            <td>${statusBadge(l.lease_status)}</td>
+            <td>
+                <div style="display:flex; gap:4px">
+                    <button class="btn btn-sm btn-secondary" onclick="viewLease(${l.id})">View</button>
+                    <button class="btn btn-sm btn-secondary" onclick="activateLease(${l.id})">Activate</button>
+                </div>
+            </td>
+        </tr>`).join('');
+        } catch (e) {
+            setTableState('leasesTable', 9, 'Could not load leases');
+            showToast(e.message || 'Failed to load leases', 'error');
+        }
     }
 
     async function viewLease(id) {
-        const l = await apiFetch(`/api/leases/${id}`);
-        openModal('viewLeaseModal');
+        try {
+            const l = await apiFetch(`/api/leases/${id}`);
+            openModal('viewLeaseModal');
 
-        document.getElementById('viewLeaseTitle').textContent = `Lease #${l.lease_number}`;
-        document.getElementById('viewLeaseContent').innerHTML = `
-            <div>
-                <p><strong>Property:</strong> #${l.property_id}</p>
-                <p><strong>Unit:</strong> #${l.unit_id || 'N/A'}</p>
-                <p><strong>Tenant:</strong> #${l.tenant_id}</p>
-                <p><strong>Type:</strong> ${l.lease_type}</p>
-            </div>
-            <div>
-                <p><strong>Dates:</strong> ${formatDate(l.start_date)} to ${formatDate(l.end_date)}</p>
-                <p><strong>Rent:</strong> ${formatCurrency(l.base_rent_amount, l.base_rent_currency)} (${l.rent_frequency})</p>
-                <p><strong>Status:</strong> ${statusBadge(l.lease_status)}</p>
-            </div>
-        `;
+            document.getElementById('viewLeaseTitle').textContent = `Lease #${l.lease_number}`;
+            document.getElementById('viewLeaseContent').innerHTML = `
+                <div>
+                    <p><strong>Property:</strong> #${l.property_id}</p>
+                    <p><strong>Unit:</strong> #${l.unit_id || 'N/A'}</p>
+                    <p><strong>Tenant:</strong> #${l.tenant_id}</p>
+                    <p><strong>Type:</strong> ${l.lease_type}</p>
+                </div>
+                <div>
+                    <p><strong>Dates:</strong> ${formatDate(l.start_date)} to ${formatDate(l.end_date)}</p>
+                    <p><strong>Rent:</strong> ${formatCurrency(l.base_rent_amount, l.base_rent_currency)} (${l.rent_frequency})</p>
+                    <p><strong>Status:</strong> ${statusBadge(l.lease_status)}</p>
+                </div>
+            `;
 
-        const sched = l.rent_schedules || [];
-        document.getElementById('viewLeaseScheduleTable').innerHTML = sched.map(s => `
-            <tr>
-                <td><strong>${formatDate(s.due_date)}</strong></td>
-                <td><small>${formatDate(s.period_start)} - ${formatDate(s.period_end)}</small></td>
-                <td>${formatCurrency(s.total_amount || s.scheduled_amount, s.currency)}</td>
-                <td>${s.is_paid ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">Unpaid</span>'}</td>
-            </tr>
-        `).join('') || '<tr><td colspan="4" class="empty-state">No schedule items</td></tr>';
+            const sched = l.rent_schedules || [];
+            document.getElementById('viewLeaseScheduleTable').innerHTML = sched.map(s => `
+                <tr>
+                    <td><strong>${formatDate(s.due_date)}</strong></td>
+                    <td><small>${formatDate(s.period_start)} - ${formatDate(s.period_end)}</small></td>
+                    <td>${formatCurrency(s.total_amount || s.scheduled_amount, s.currency)}</td>
+                    <td>${s.is_paid ? '<span class="badge badge-success">Paid</span>' : '<span class="badge badge-warning">Unpaid</span>'}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="empty-state">No schedule items</td></tr>';
+        } catch (e) {
+            showToast(e.message || 'Failed to load lease details', 'error');
+        }
     }
 
     async function saveLease() {
@@ -329,7 +350,13 @@
     }
 
     async function activateLease(id) {
-        await apiFetch(`/api/leases/${id}/activate`, { method: 'POST' }); showToast('Lease activated'); loadLeases();
+        try {
+            await apiFetch(`/api/leases/${id}/activate`, { method: 'POST' });
+            showToast('Lease activated');
+            loadLeases();
+        } catch (e) {
+            showToast(e.message || 'Failed to activate lease', 'error');
+        }
     }
 
     loadLeases();

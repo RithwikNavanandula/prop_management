@@ -170,4 +170,28 @@ def list_roles(
     current_user: UserAccount = Depends(require_permissions(["admin", "users", "system"])),
 ):
     roles = db.query(Role).all()
-    return [{"id": r.id, "role_name": r.role_name, "description": r.description, "permissions": r.permissions} for r in roles]
+    return [{"id": r.id, "role_name": r.role_name, "description": r.description,
+             "permissions": r.permissions, "is_system": r.is_system, "is_active": r.is_active} for r in roles]
+
+
+@router.put("/roles/{role_id}")
+def update_role(
+    role_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: UserAccount = Depends(require_permissions(["admin", "system"])),
+):
+    role = db.query(Role).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if "permissions" in data:
+        role.permissions = data["permissions"]
+    if "description" in data:
+        role.description = data["description"]
+    if "is_active" in data:
+        role.is_active = data["is_active"]
+    db.commit()
+    db.refresh(role)
+    return {"id": role.id, "role_name": role.role_name, "description": role.description,
+            "permissions": role.permissions, "is_system": role.is_system, "is_active": role.is_active}
+

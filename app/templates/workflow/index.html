@@ -11,8 +11,9 @@
 
 <!-- Workflows Tab -->
 <div id="workflows" class="tab-content" style="display:block;">
-    <div class="actions-bar">
-        <button class="btn btn-primary" onclick="openModal('createWorkflowModal')">Create Workflow</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h4 style="margin:0">Workflow Definitions</h4>
+        <button class="btn btn-primary" onclick="openNewWorkflow()">+ Create Workflow</button>
     </div>
     <div class="card">
         <table class="data-table">
@@ -22,9 +23,14 @@
                     <th>Trigger</th>
                     <th>Description</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="wfTable"></tbody>
+            <tbody id="wfTable">
+                <tr>
+                    <td colspan="5">Loading...</td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
@@ -39,59 +45,161 @@
                     <th>Triggered By</th>
                     <th>Triggered At</th>
                     <th>Status</th>
+                    <th>Completed At</th>
+                    <th>Error</th>
                 </tr>
             </thead>
-            <tbody id="logTable"></tbody>
+            <tbody id="logTable">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
 
+<!-- Create/Edit Workflow Modal -->
+<div class="modal-backdrop" id="wfModal">
+    <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+            <h3 id="wfModalTitle">Create Workflow</h3>
+            <button class="modal-close" onclick="closeModal('wfModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="wfForm">
+                <input type="hidden" name="id" id="wfId">
+                <div class="form-group"><label class="form-label">Workflow Name*</label>
+                    <input class="form-control" name="workflow_name" required placeholder="e.g. Lease Expiry Reminder">
+                </div>
+                <div class="form-group"><label class="form-label">Trigger Event</label>
+                    <input class="form-control" name="trigger_event" placeholder="e.g. lease.expiring_soon">
+                </div>
+                <div class="form-group"><label class="form-label">Description</label>
+                    <textarea class="form-control" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><input type="checkbox" id="wfActive" checked> Active</label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('wfModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveWorkflow()">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
-        tablinks = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
         if (tabName === 'workflows') loadWorkflows();
         if (tabName === 'logs') loadLogs();
     }
 
+    function openNewWorkflow() {
+        document.getElementById('wfForm').reset();
+        document.getElementById('wfId').value = '';
+        document.getElementById('wfModalTitle').textContent = 'Create Workflow';
+        document.getElementById('wfActive').checked = true;
+        openModal('wfModal');
+    }
+
+    async function editWorkflow(id) {
+        try {
+            const data = await apiFetch('/api/workflow/definitions');
+            const w = data.items.find(x => x.id === id);
+            if (!w) return;
+            document.getElementById('wfId').value = w.id;
+            document.getElementById('wfModalTitle').textContent = 'Edit Workflow';
+            const form = document.getElementById('wfForm');
+            form.querySelector('[name="workflow_name"]').value = w.workflow_name || '';
+            form.querySelector('[name="trigger_event"]').value = w.trigger_event || '';
+            form.querySelector('[name="description"]').value = w.description || '';
+            document.getElementById('wfActive').checked = w.is_active;
+            openModal('wfModal');
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
     async function loadWorkflows() {
-        const resp = await fetch('/api/workflow/definitions');
-        const data = await resp.json();
-        const tbody = document.getElementById('wfTable');
-        tbody.innerHTML = '';
-        data.items.forEach(w => {
-            tbody.innerHTML += `
+        setTableState('wfTable', 5, 'Loading workflows...');
+        try {
+            const data = await apiFetch('/api/workflow/definitions');
+            const tbody = document.getElementById('wfTable');
+            if (!data.items || !data.items.length) {
+                setTableState('wfTable', 5, 'No workflows defined');
+                return;
+            }
+            tbody.innerHTML = data.items.map(w => `
                 <tr>
-                    <td>${w.workflow_name}</td>
+                    <td><strong>${w.workflow_name}</strong></td>
                     <td>${w.trigger_event || '-'}</td>
                     <td>${w.description || '-'}</td>
                     <td><span class="badge badge-${w.is_active ? 'success' : 'secondary'}">${w.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td style="white-space:nowrap">
+                        <button class="btn btn-sm btn-secondary" onclick="editWorkflow(${w.id})">✏️</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteWorkflow(${w.id})">🗑️</button>
+                    </td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (e) {
+            setTableState('wfTable', 5, 'Could not load workflows');
+            showToast(e.message || 'Failed to load workflows', 'error');
+        }
+    }
+
+    async function saveWorkflow() {
+        const d = {};
+        new FormData(document.getElementById('wfForm')).forEach((v, k) => { if (k !== 'id' || v) d[k] = v; });
+        d.is_active = document.getElementById('wfActive').checked;
+        try {
+            const id = document.getElementById('wfId').value;
+            if (id) {
+                await apiFetch(`/api/workflow/definitions/${id}`, { method: 'PUT', body: JSON.stringify(d) });
+                showToast('Workflow updated');
+            } else {
+                await apiFetch('/api/workflow/definitions', { method: 'POST', body: JSON.stringify(d) });
+                showToast('Workflow created');
+            }
+            closeModal('wfModal'); loadWorkflows();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteWorkflow(id) {
+        if (!confirm('Delete this workflow?')) return;
+        try {
+            await apiFetch(`/api/workflow/definitions/${id}`, { method: 'DELETE' });
+            showToast('Workflow deleted'); loadWorkflows();
+        } catch (e) { showToast(e.message, 'error'); }
     }
 
     async function loadLogs() {
-        const resp = await fetch('/api/workflow/execution-logs');
-        const data = await resp.json();
-        const tbody = document.getElementById('logTable');
-        tbody.innerHTML = '';
-        data.items.forEach(l => {
-            tbody.innerHTML += `
+        setTableState('logTable', 6, 'Loading execution logs...');
+        try {
+            const data = await apiFetch('/api/workflow/execution-logs');
+            const tbody = document.getElementById('logTable');
+            if (!data.items || !data.items.length) {
+                setTableState('logTable', 6, 'No execution logs found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(l => `
                 <tr>
                     <td>${l.workflow_id}</td>
-                    <td>${l.triggered_by}</td>
+                    <td>${l.triggered_by || '-'}</td>
                     <td>${new Date(l.triggered_at).toLocaleString()}</td>
-                    <td>${l.status}</td>
+                    <td><span class="badge badge-${l.status === 'Completed' ? 'success' : l.status === 'Failed' ? 'danger' : 'warning'}">${l.status}</span></td>
+                    <td>${l.completed_at ? new Date(l.completed_at).toLocaleString() : '-'}</td>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${l.error_message || '-'}</td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (e) {
+            setTableState('logTable', 6, 'Could not load execution logs');
+            showToast(e.message || 'Failed to load execution logs', 'error');
+        }
     }
 
     // Initial load

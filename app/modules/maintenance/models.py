@@ -126,3 +126,54 @@ class WorkOrderTimeEntry(Base):
     hours = Column(Numeric(6, 2), default=0)
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Resource(Base):
+    __tablename__ = "resources"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    resource_name = Column(String(200), nullable=False)
+    resource_type = Column(String(30), default="Staff")  # Staff, Contractor, Equipment
+    specialty = Column(String(100))
+    availability = Column(String(20), default="Available")  # Available, Busy, OnLeave
+    hourly_rate = Column(Numeric(10, 2), default=0)
+    contact_info = Column(String(200))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ResourceAllocation(Base):
+    __tablename__ = "resource_allocations"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=False)
+    allocated_by = Column(Integer, ForeignKey("user_accounts.id"))
+    allocated_at = Column(DateTime, server_default=func.now())
+    released_at = Column(DateTime)
+    status = Column(String(20), default="Allocated")  # Allocated, Released, Completed
+
+
+class ConsumableRequest(Base):
+    __tablename__ = "consumable_requests"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=False)
+    resource_id = Column(Integer, ForeignKey("resources.id"))
+    requested_by = Column(Integer, ForeignKey("user_accounts.id"))
+    items_description = Column(Text, nullable=False)
+    estimated_cost = Column(Numeric(14, 2), default=0)
+    status = Column(String(20), default="Requested")  # Requested, Approved, Fulfilled, Rejected
+    approved_by = Column(Integer, ForeignKey("user_accounts.id"))
+    approved_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class TenantFeedback(Base):
+    __tablename__ = "tenant_feedback"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"))
+    rating = Column(Integer, default=0)  # 1-5 stars
+    comments = Column(Text)
+    submitted_at = Column(DateTime, server_default=func.now())
+

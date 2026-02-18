@@ -165,9 +165,6 @@
 
 {% block scripts %}
 <script>
-    function openModal(id) { document.getElementById(id).classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
     function switchAcctTab(name, el) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         el.classList.add('active');
@@ -181,11 +178,12 @@
     document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
 
     async function loadCOA() {
+        setTableState('coaTableBody', 5, 'Loading chart of accounts...');
         try {
             const data = await apiFetch('/api/accounting/chart-of-accounts');
             const tbody = document.getElementById('coaTableBody');
             if (!data.items || !data.items.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No accounts found</td></tr>';
+                setTableState('coaTableBody', 5, 'No accounts found');
                 return;
             }
             tbody.innerHTML = data.items.map(acc => `
@@ -197,15 +195,19 @@
                     <td>${statusBadge(acc.status || 'Active')}</td>
                 </tr>
             `).join('');
-        } catch (e) { console.error('COA load error:', e); }
+        } catch (e) {
+            setTableState('coaTableBody', 5, 'Could not load chart of accounts');
+            showToast(e.message || 'COA load failed', 'error');
+        }
     }
 
     async function loadJournals() {
+        setTableState('jeTableBody', 6, 'Loading journal entries...');
         try {
             const data = await apiFetch('/api/accounting/journal-entries');
             const tbody = document.getElementById('jeTableBody');
             if (!data.items || !data.items.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No journal entries found</td></tr>';
+                setTableState('jeTableBody', 6, 'No journal entries found');
                 return;
             }
             tbody.innerHTML = data.items.map(je => `
@@ -218,7 +220,10 @@
                     <td>${statusBadge(je.status || 'Posted')}</td>
                 </tr>
             `).join('');
-        } catch (e) { console.error('Journal load error:', e); }
+        } catch (e) {
+            setTableState('jeTableBody', 6, 'Could not load journal entries');
+            showToast(e.message || 'Journal load failed', 'error');
+        }
     }
 
     async function loadReport() {

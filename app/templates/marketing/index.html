@@ -10,18 +10,17 @@
     <button class="tab-btn" onclick="openTab(event, 'applications')">Applications</button>
 </div>
 
-<!-- Listings Tab -->
 <div id="listings" class="tab-content" style="display:block;">
     <div class="actions-bar">
         <button class="btn btn-primary" onclick="openModal('createListingModal')">Create Listing</button>
     </div>
-    <div class="grid-3" id="listingsGrid">
-        <!-- Populated by JS -->
-    </div>
+    <div class="grid-3" id="listingsGrid"></div>
 </div>
 
-<!-- Leads Tab -->
 <div id="leads" class="tab-content">
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openModal('addLeadModal')">Add Lead</button>
+    </div>
     <div class="card">
         <table class="data-table">
             <thead>
@@ -37,8 +36,10 @@
     </div>
 </div>
 
-<!-- Applications Tab -->
 <div id="applications" class="tab-content">
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="openModal('addApplicationModal')">New Application</button>
+    </div>
     <div class="card">
         <table class="data-table">
             <thead>
@@ -54,13 +55,192 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="createListingModal">
+    <div class="modal" style="max-width:720px;">
+        <div class="modal-header">
+            <h3>Create Listing</h3>
+            <button class="modal-close" type="button" onclick="closeModal('createListingModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="listingForm" onsubmit="saveListing(event)">
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input class="form-control" name="listing_title" required maxlength="300">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="listing_description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Property ID</label>
+                        <input class="form-control" name="property_id" type="number" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unit ID</label>
+                        <input class="form-control" name="unit_id" type="number" min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Rent From</label>
+                        <input class="form-control" name="rent_from" type="number" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Rent To</label>
+                        <input class="form-control" name="rent_to" type="number" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Currency</label>
+                        <input class="form-control" name="currency" value="USD" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-control" name="status">
+                            <option value="Draft">Draft</option>
+                            <option value="Active">Active</option>
+                            <option value="Paused">Paused</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;gap:8px;align-items:center;">
+                        <input type="checkbox" name="is_published" value="1">
+                        Publish now
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('createListingModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('listingForm').requestSubmit()">Create</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addLeadModal">
+    <div class="modal" style="max-width:720px;">
+        <div class="modal-header">
+            <h3>Add Lead</h3>
+            <button class="modal-close" type="button" onclick="closeModal('addLeadModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="leadForm" onsubmit="saveLead(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Name *</label>
+                        <input class="form-control" name="first_name" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name *</label>
+                        <input class="form-control" name="last_name" required maxlength="100">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" name="email" type="email" maxlength="255">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input class="form-control" name="phone" maxlength="50">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Listing ID</label>
+                        <input class="form-control" name="listing_id" type="number" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unit ID</label>
+                        <input class="form-control" name="unit_id" type="number" min="1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Lead Source ID</label>
+                        <input class="form-control" name="lead_source_id" type="number" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Lead Status</label>
+                        <select class="form-control" name="lead_status">
+                            <option value="New">New</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Qualified">Qualified</option>
+                            <option value="Lost">Lost</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('addLeadModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('leadForm').requestSubmit()">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addApplicationModal">
+    <div class="modal" style="max-width:720px;">
+        <div class="modal-header">
+            <h3>Create Application</h3>
+            <button class="modal-close" type="button" onclick="closeModal('addApplicationModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="applicationForm" onsubmit="saveApplication(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Lead ID</label>
+                        <input class="form-control" name="lead_id" type="number" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unit ID *</label>
+                        <input class="form-control" name="unit_id" type="number" min="1" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Tenant ID</label>
+                        <input class="form-control" name="tenant_id" type="number" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Desired Lease Term (months)</label>
+                        <input class="form-control" name="desired_lease_term" type="number" min="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-control" name="status">
+                        <option value="Submitted">Submitted</option>
+                        <option value="Review">Review</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('addApplicationModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('applicationForm').requestSubmit()">Create</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
-        tablinks = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        const tabcontent = document.getElementsByClassName("tab-content");
+        for (let i = 0; i < tabcontent.length; i += 1) {
+            tabcontent[i].style.display = "none";
+        }
+        const tablinks = document.getElementsByClassName("tab-btn");
+        for (let i = 0; i < tablinks.length; i += 1) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
 
@@ -69,62 +249,202 @@
         if (tabName === 'applications') loadApps();
     }
 
+    function toIntOrNull(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = Number.parseInt(value, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function toFloatOrNull(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = Number.parseFloat(value);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function safeItems(data) {
+        if (data && Array.isArray(data.items)) return data.items;
+        return [];
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+        ));
+    }
+
     async function loadListings() {
-        const resp = await fetch('/api/marketing/listings');
-        const data = await resp.json();
         const grid = document.getElementById('listingsGrid');
-        grid.innerHTML = '';
-        data.items.forEach(l => {
-            grid.innerHTML += `
+        grid.innerHTML = '<div class="empty-state"><p>Loading listings...</p></div>';
+        try {
+            const data = await apiFetch('/api/marketing/listings');
+            const items = safeItems(data);
+            if (!items.length) {
+                grid.innerHTML = '<div class="card"><div class="empty-state"><p>No listings found</p></div></div>';
+                return;
+            }
+            grid.innerHTML = items.map((l) => `
                 <div class="stat-card">
-                    <h3>${l.listing_title}</h3>
-                    <p style="color:#aaa;">${l.listing_description || 'No description'}</p>
-                    <div style="margin-top:10px; font-weight:bold;">${formatCurrency(l.rent_from)} - ${formatCurrency(l.rent_to)}</div>
-                    <div style="margin-top:10px;">
-                        <span class="badge badge-${l.is_published ? 'success' : 'secondary'}">
+                    <h3>${escapeHtml(l.listing_title || 'Untitled')}</h3>
+                    <p style="color:var(--text-muted);">${escapeHtml(l.listing_description || 'No description')}</p>
+                    <div style="margin-top:10px; font-weight:700;">${formatCurrency(l.rent_from || 0, l.currency || 'USD')} - ${formatCurrency(l.rent_to || l.rent_from || 0, l.currency || 'USD')}</div>
+                    <div style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span class="badge badge-${l.is_published ? 'success' : 'neutral'}">
                             ${l.is_published ? 'Published' : 'Draft'}
                         </span>
+                        ${statusBadge(l.status || 'Draft')}
                     </div>
                 </div>
-            `;
-        });
+            `).join('');
+        } catch (error) {
+            grid.innerHTML = '<div class="card"><div class="empty-state"><p>Could not load listings</p></div></div>';
+            showToast(error.message || 'Failed to load listings', 'error');
+        }
     }
 
     async function loadLeads() {
-        const resp = await fetch('/api/marketing/leads');
-        const data = await resp.json();
         const tbody = document.getElementById('leadsTable');
-        tbody.innerHTML = '';
-        data.items.forEach(l => {
-            tbody.innerHTML += `
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>Loading leads...</p></td></tr>';
+        try {
+            const data = await apiFetch('/api/marketing/leads');
+            const items = safeItems(data);
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>No leads yet</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map((l) => `
                 <tr>
-                    <td>${l.first_name} ${l.last_name}</td>
-                    <td>${l.lead_source_id || '-'}</td>
-                    <td><span class="badge badge-info">${l.lead_status}</span></td>
-                    <td>${l.last_contact_date ? new Date(l.last_contact_date).toLocaleDateString() : '-'}</td>
+                    <td>${escapeHtml(`${l.first_name || ''} ${l.last_name || ''}`.trim() || '-')}</td>
+                    <td>${escapeHtml(String(l.lead_source_id || '-'))}</td>
+                    <td>${statusBadge(l.lead_status || 'New')}</td>
+                    <td>${formatDate(l.last_contact_date || l.first_contact_date)}</td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>Could not load leads</p></td></tr>';
+            showToast(error.message || 'Failed to load leads', 'error');
+        }
     }
 
     async function loadApps() {
-        const resp = await fetch('/api/marketing/applications');
-        const data = await resp.json();
         const tbody = document.getElementById('appsTable');
-        tbody.innerHTML = '';
-        data.items.forEach(a => {
-            tbody.innerHTML += `
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>Loading applications...</p></td></tr>';
+        try {
+            const data = await apiFetch('/api/marketing/applications');
+            const items = safeItems(data);
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>No applications yet</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map((a) => `
                 <tr>
                     <td>App #${a.id}</td>
-                    <td>Unit #${a.unit_id || '-'}</td>
-                    <td>${a.status}</td>
-                    <td>${a.application_date}</td>
+                    <td>Unit #${escapeHtml(String(a.unit_id || '-'))}</td>
+                    <td>${statusBadge(a.status || 'Submitted')}</td>
+                    <td>${formatDate(a.application_date || a.created_at)}</td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><p>Could not load applications</p></td></tr>';
+            showToast(error.message || 'Failed to load applications', 'error');
+        }
     }
 
-    // Initial load
+    async function saveListing(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.listing_title = (payload.listing_title || '').trim();
+        payload.property_id = toIntOrNull(payload.property_id);
+        payload.unit_id = toIntOrNull(payload.unit_id);
+        payload.rent_from = toFloatOrNull(payload.rent_from);
+        payload.rent_to = toFloatOrNull(payload.rent_to);
+        payload.is_published = form.querySelector('input[name=\"is_published\"]')?.checked || false;
+
+        if (!payload.listing_title) {
+            showToast('Listing title is required', 'error');
+            return;
+        }
+
+        Object.keys(payload).forEach((key) => {
+            if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+            if (payload[key] === '' || payload[key] === null) delete payload[key];
+        });
+
+        try {
+            await apiFetch('/api/marketing/listings', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            closeModal('createListingModal');
+            form.reset();
+            showToast('Listing created');
+            loadListings();
+        } catch (error) {
+            showToast(error.message || 'Failed to create listing', 'error');
+        }
+    }
+
+    async function saveLead(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.first_name = (payload.first_name || '').trim();
+        payload.last_name = (payload.last_name || '').trim();
+        payload.listing_id = toIntOrNull(payload.listing_id);
+        payload.unit_id = toIntOrNull(payload.unit_id);
+        payload.lead_source_id = toIntOrNull(payload.lead_source_id);
+        if (!payload.first_name || !payload.last_name) {
+            showToast('Lead first and last name are required', 'error');
+            return;
+        }
+        Object.keys(payload).forEach((key) => {
+            if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+            if (payload[key] === '' || payload[key] === null) delete payload[key];
+        });
+        try {
+            await apiFetch('/api/marketing/leads', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            closeModal('addLeadModal');
+            form.reset();
+            showToast('Lead added');
+            loadLeads();
+        } catch (error) {
+            showToast(error.message || 'Failed to add lead', 'error');
+        }
+    }
+
+    async function saveApplication(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.lead_id = toIntOrNull(payload.lead_id);
+        payload.unit_id = toIntOrNull(payload.unit_id);
+        payload.tenant_id = toIntOrNull(payload.tenant_id);
+        payload.desired_lease_term = toIntOrNull(payload.desired_lease_term);
+        if (!payload.unit_id) {
+            showToast('Unit ID is required', 'error');
+            return;
+        }
+        Object.keys(payload).forEach((key) => {
+            if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+            if (payload[key] === '' || payload[key] === null) delete payload[key];
+        });
+        try {
+            await apiFetch('/api/marketing/applications', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            closeModal('addApplicationModal');
+            form.reset();
+            showToast('Application created');
+            loadApps();
+        } catch (error) {
+            showToast(error.message || 'Failed to create application', 'error');
+        }
+    }
+
     loadListings();
 </script>
 {% endblock %}

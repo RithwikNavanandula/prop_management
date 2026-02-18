@@ -4,65 +4,122 @@
 {% block page_title %}Maintenance & Work Orders{% endblock %}
 
 {% block content %}
-<div style="display:flex;justify-content:space-between;margin-bottom:24px">
-    <div style="display:flex;gap:12px">
-        <select class="form-control" style="width:140px" id="statusFilter" onchange="loadRequests()">
-            <option value="">All Status</option>
-            <option>New</option>
-            <option>InProgress</option>
-            <option>Completed</option>
-            <option>Cancelled</option>
-        </select>
-        <select class="form-control" style="width:140px" id="priorityFilter" onchange="loadRequests()">
-            <option value="">All Priority</option>
-            <option>P1</option>
-            <option>P2</option>
-            <option>P3</option>
-            <option>P4</option>
-            <option>P5</option>
-        </select>
-    </div>
-    <button class="btn btn-primary" onclick="openModal('addReqModal')">+ New Request</button>
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab(event, 'requests')">Requests</button>
+    <button class="tab-btn" onclick="openTab(event, 'resources')">Resources</button>
 </div>
-<div class="card">
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Req #</th>
-                    <th>Category</th>
-                    <th>Priority</th>
-                    <th>Property</th>
-                    <th>Reported</th>
-                    <th>Status</th>
-                    <th>SLA</th>
-                </tr>
-            </thead>
-            <tbody id="reqTable">
-                <tr>
-                    <td colspan="7">Loading...</td>
-                </tr>
-            </tbody>
-        </table>
+
+<!-- Requests Tab -->
+<div id="requests" class="tab-content" style="display:block;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:24px">
+        <div style="display:flex;gap:12px">
+            <select class="form-control" style="width:140px" id="statusFilter" onchange="loadRequests()">
+                <option value="">All Status</option>
+                <option>New</option>
+                <option>InProgress</option>
+                <option>Completed</option>
+                <option>Cancelled</option>
+            </select>
+            <select class="form-control" style="width:140px" id="priorityFilter" onchange="loadRequests()">
+                <option value="">All Priority</option>
+                <option>P1</option>
+                <option>P2</option>
+                <option>P3</option>
+                <option>P4</option>
+                <option>P5</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="openNewRequest()">+ New Request</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Req #</th>
+                        <th>Category</th>
+                        <th>Priority</th>
+                        <th>Property</th>
+                        <th>Unit</th>
+                        <th>Tenant</th>
+                        <th>Reported</th>
+                        <th>Status</th>
+                        <th>SLA</th>
+                    </tr>
+                </thead>
+                <tbody id="reqTable">
+                    <tr>
+                        <td colspan="9">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
+<!-- Resources Tab -->
+<div id="resources" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h4 style="margin:0">Resource Master</h4>
+        <button class="btn btn-primary" onclick="openNewResource()">+ Add Resource</button>
+    </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Specialty</th>
+                        <th>Hourly Rate</th>
+                        <th>Availability</th>
+                        <th>Contact</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="resTable">
+                    <tr>
+                        <td colspan="7">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- New Request Modal -->
 <div class="modal-backdrop" id="addReqModal">
-    <div class="modal">
+    <div class="modal" style="max-width:700px">
         <div class="modal-header">
             <h3>New Maintenance Request</h3><button class="modal-close" onclick="closeModal('addReqModal')">×</button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto">
             <form id="reqForm">
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Request #*</label><input class="form-control"
                             name="request_number" required></div>
-                    <div class="form-group"><label class="form-label">Property ID*</label><input class="form-control"
-                            name="property_id" type="number" required></div>
+                    <div class="form-group"><label class="form-label">Property*</label>
+                        <select class="form-control" name="property_id" id="maintPropSelect" required
+                            onchange="loadMaintUnitsAndTenants()">
+                            <option value="">Select Property</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label class="form-label">Category</label><select class="form-control"
-                            name="category">
+                    <div class="form-group"><label class="form-label">Unit</label>
+                        <select class="form-control" name="unit_id" id="maintUnitSelect">
+                            <option value="">Select Unit</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Tenant</label>
+                        <select class="form-control" name="tenant_id" id="maintTenantSelect">
+                            <option value="">Select Tenant</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Category</label>
+                        <select class="form-control" name="category">
                             <option>Plumbing</option>
                             <option>Electrical</option>
                             <option>HVAC</option>
@@ -70,15 +127,17 @@
                             <option>Structural</option>
                             <option>IT</option>
                             <option>General</option>
-                        </select></div>
-                    <div class="form-group"><label class="form-label">Priority</label><select class="form-control"
-                            name="priority">
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Priority</label>
+                        <select class="form-control" name="priority">
                             <option>P1</option>
                             <option>P2</option>
                             <option selected>P3</option>
                             <option>P4</option>
                             <option>P5</option>
-                        </select></div>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group"><label class="form-label">Description*</label><textarea class="form-control"
                         name="description" required></textarea></div>
@@ -91,37 +150,211 @@
                 onclick="saveRequest()">Submit</button></div>
     </div>
 </div>
+
+<!-- Add Resource Modal -->
+<div class="modal-backdrop" id="addResModal">
+    <div class="modal" style="max-width:600px">
+        <div class="modal-header">
+            <h3 id="resModalTitle">Add Resource</h3><button class="modal-close"
+                onclick="closeModal('addResModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="resForm">
+                <input type="hidden" name="id" id="resId">
+                <div class="form-group"><label class="form-label">Resource Name*</label><input class="form-control"
+                        name="resource_name" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Type</label>
+                        <select class="form-control" name="resource_type">
+                            <option>Staff</option>
+                            <option>Contractor</option>
+                            <option>Equipment</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Specialty</label>
+                        <input class="form-control" name="specialty" placeholder="e.g. Plumbing">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Hourly Rate ($)</label>
+                        <input class="form-control" name="hourly_rate" type="number" step="0.01" value="0">
+                    </div>
+                    <div class="form-group"><label class="form-label">Contact Info</label>
+                        <input class="form-control" name="contact_info" placeholder="Phone/Email">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addResModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveResource()">Save</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    function openModal(id) { document.getElementById(id).classList.add('active') }
-    function closeModal(id) { document.getElementById(id).classList.remove('active') }
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+        if (tabName === 'requests') loadRequests();
+        if (tabName === 'resources') loadResources();
+    }
+
+    /* ─── Requests ─── */
+    async function openNewRequest() {
+        document.getElementById('reqForm').reset();
+        await loadPropertyDropdown();
+        openModal('addReqModal');
+    }
+
+    async function loadPropertyDropdown() {
+        try {
+            const data = await apiFetch('/api/properties?limit=200');
+            document.getElementById('maintPropSelect').innerHTML = '<option value="">Select Property</option>' +
+                data.items.map(p => `<option value="${p.id}">${p.property_name}</option>`).join('');
+        } catch (e) { console.error('Failed to load properties', e); }
+    }
+
+    async function loadMaintUnitsAndTenants() {
+        const propId = document.getElementById('maintPropSelect').value;
+        const unitSel = document.getElementById('maintUnitSelect');
+        const tenantSel = document.getElementById('maintTenantSelect');
+        unitSel.innerHTML = '<option value="">Select Unit</option>';
+        tenantSel.innerHTML = '<option value="">Select Tenant</option>';
+        if (!propId) return;
+        try {
+            const unitData = await apiFetch(`/api/properties/${propId}/units`);
+            unitSel.innerHTML = '<option value="">Select Unit</option>' +
+                unitData.items.map(u => `<option value="${u.id}">${u.unit_number}</option>`).join('');
+        } catch (e) { console.error('Failed to load units', e); }
+        try {
+            const tenantData = await apiFetch('/api/tenants?limit=200');
+            tenantSel.innerHTML = '<option value="">Select Tenant</option>' +
+                tenantData.items.map(t => `<option value="${t.id}">${t.first_name || ''} ${t.last_name || ''} (${t.tenant_code || t.id})</option>`).join('');
+        } catch (e) { console.error('Failed to load tenants', e); }
+    }
 
     async function loadRequests() {
         const st = document.getElementById('statusFilter').value;
         const pr = document.getElementById('priorityFilter').value;
         let url = '/api/maintenance/requests?limit=100';
         if (st) url += `&status=${st}`; if (pr) url += `&priority=${pr}`;
-        const data = await apiFetch(url);
-        const tb = document.getElementById('reqTable');
-        if (!data.items.length) { tb.innerHTML = '<tr><td colspan="7" class="empty-state"><p>No requests</p></td></tr>'; return; }
-        tb.innerHTML = data.items.map(r => `<tr>
-        <td><strong>${r.request_number}</strong></td><td>${r.category}</td>
-        <td><span class="badge badge-${r.priority === 'P1' ? 'danger' : r.priority === 'P2' ? 'warning' : 'info'}">${r.priority}</span></td>
-        <td>${r.property_id}</td><td>${formatDate(r.reported_at)}</td>
-        <td>${statusBadge(r.status)}</td>
-        <td>${r.sla_resolution_breached ? '<span class="badge badge-danger">Breached</span>' : '<span class="badge badge-success">OK</span>'}</td>
-    </tr>`).join('');
+        setTableState('reqTable', 9, 'Loading requests...');
+        try {
+            const data = await apiFetch(url);
+            const tb = document.getElementById('reqTable');
+            if (!data.items.length) {
+                setTableState('reqTable', 9, 'No requests found');
+                return;
+            }
+            tb.innerHTML = data.items.map(r => `<tr>
+                <td><strong>${r.request_number}</strong></td><td>${r.category}</td>
+                <td><span class="badge badge-${r.priority === 'P1' ? 'danger' : r.priority === 'P2' ? 'warning' : 'info'}">${r.priority}</span></td>
+                <td>${r.property_id}</td><td>${r.unit_id || '-'}</td><td>${r.tenant_id || '-'}</td>
+                <td>${formatDate(r.reported_at)}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td>${r.sla_resolution_breached ? '<span class="badge badge-danger">Breached</span>' : '<span class="badge badge-success">OK</span>'}</td>
+            </tr>`).join('');
+        } catch (e) {
+            setTableState('reqTable', 9, 'Could not load requests');
+            showToast(e.message || 'Failed to load requests', 'error');
+        }
     }
 
     async function saveRequest() {
-        const d = {}; new FormData(document.getElementById('reqForm')).forEach((v, k) => { d[k] = v });
+        const d = {}; new FormData(document.getElementById('reqForm')).forEach((v, k) => { d[k] = v; });
         d.property_id = parseInt(d.property_id);
-        await apiFetch('/api/maintenance/requests', { method: 'POST', body: JSON.stringify(d) });
-        closeModal('addReqModal'); showToast('Request submitted'); loadRequests();
+        d.unit_id = d.unit_id ? parseInt(d.unit_id) : null;
+        d.tenant_id = d.tenant_id ? parseInt(d.tenant_id) : null;
+        try {
+            await apiFetch('/api/maintenance/requests', { method: 'POST', body: JSON.stringify(d) });
+            closeModal('addReqModal');
+            showToast('Request submitted');
+            loadRequests();
+        } catch (e) {
+            showToast(e.message || 'Failed to submit request', 'error');
+        }
     }
 
+    /* ─── Resources ─── */
+    function openNewResource() {
+        document.getElementById('resForm').reset();
+        document.getElementById('resId').value = '';
+        document.getElementById('resModalTitle').textContent = 'Add Resource';
+        openModal('addResModal');
+    }
+
+    function editResource(id) {
+        apiFetch('/api/maintenance/resources').then(data => {
+            const r = data.items.find(x => x.id === id);
+            if (!r) return;
+            document.getElementById('resId').value = r.id;
+            document.getElementById('resModalTitle').textContent = 'Edit Resource';
+            const form = document.getElementById('resForm');
+            form.querySelector('[name="resource_name"]').value = r.resource_name || '';
+            form.querySelector('[name="resource_type"]').value = r.resource_type || 'Staff';
+            form.querySelector('[name="specialty"]').value = r.specialty || '';
+            form.querySelector('[name="hourly_rate"]').value = r.hourly_rate || 0;
+            form.querySelector('[name="contact_info"]').value = r.contact_info || '';
+            openModal('addResModal');
+        });
+    }
+
+    async function loadResources() {
+        setTableState('resTable', 7, 'Loading resources...');
+        try {
+            const data = await apiFetch('/api/maintenance/resources');
+            const tb = document.getElementById('resTable');
+            if (!data.items || !data.items.length) {
+                setTableState('resTable', 7, 'No resources found');
+                return;
+            }
+            tb.innerHTML = data.items.map(r => `
+                <tr>
+                    <td><strong>${r.resource_name}</strong></td>
+                    <td><span class="badge badge-info">${r.resource_type}</span></td>
+                    <td>${r.specialty || '-'}</td>
+                    <td>$${parseFloat(r.hourly_rate || 0).toFixed(2)}</td>
+                    <td><span class="badge badge-${r.availability === 'Available' ? 'success' : r.availability === 'Busy' ? 'warning' : 'secondary'}">${r.availability}</span></td>
+                    <td>${r.contact_info || '-'}</td>
+                    <td style="white-space:nowrap">
+                        <button class="btn btn-sm btn-secondary" onclick="editResource(${r.id})">✏️</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteResource(${r.id})">🗑️</button>
+                    </td>
+                </tr>`).join('');
+        } catch (e) {
+            setTableState('resTable', 7, 'Could not load resources');
+            showToast(e.message || 'Failed to load resources', 'error');
+        }
+    }
+
+    async function saveResource() {
+        const d = {}; new FormData(document.getElementById('resForm')).forEach((v, k) => { if (k !== 'id' || v) d[k] = v; });
+        if (d.hourly_rate) d.hourly_rate = parseFloat(d.hourly_rate);
+        try {
+            const id = document.getElementById('resId').value;
+            if (id) {
+                await apiFetch(`/api/maintenance/resources/${id}`, { method: 'PUT', body: JSON.stringify(d) });
+                showToast('Resource updated');
+            } else {
+                await apiFetch('/api/maintenance/resources', { method: 'POST', body: JSON.stringify(d) });
+                showToast('Resource added');
+            }
+            closeModal('addResModal'); loadResources();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteResource(id) {
+        if (!confirm('Delete this resource?')) return;
+        try { await apiFetch(`/api/maintenance/resources/${id}`, { method: 'DELETE' }); showToast('Deleted'); loadResources(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // Initial load
     loadRequests();
 </script>
 {% endblock %}

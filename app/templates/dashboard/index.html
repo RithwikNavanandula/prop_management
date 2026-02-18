@@ -1,199 +1,276 @@
 {% extends "base.html" %}
 {% set active_page = "dashboard" %}
-
 {% block title %}Dashboard — {{ settings.APP_NAME }}{% endblock %}
-{% block page_title %}Portfolio Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<div id="dashboardContent">
-    <!-- Stats -->
-    <div class="stats-grid" id="statsGrid">
-        <div class="stat-card purple animate-in">
-            <div class="stat-icon">🏢</div>
-            <div class="stat-value" id="statProperties">-</div>
-            <div class="stat-label">Total Properties</div>
-        </div>
-        <div class="stat-card teal animate-in" style="animation-delay:0.1s">
-            <div class="stat-icon">🏠</div>
-            <div class="stat-value" id="statUnits">-</div>
-            <div class="stat-label">Total Units</div>
-        </div>
-        <div class="stat-card pink animate-in" style="animation-delay:0.2s">
-            <div class="stat-icon">📊</div>
-            <div class="stat-value" id="statOccupancy">-</div>
-            <div class="stat-label">Occupancy Rate</div>
-        </div>
-        <div class="stat-card gold animate-in" style="animation-delay:0.3s">
-            <div class="stat-icon">💰</div>
-            <div class="stat-value" id="statRevenue">-</div>
-            <div class="stat-label">Total Revenue</div>
-        </div>
-    </div>
-
-    <!-- Secondary Stats -->
-    <div class="stats-grid">
-        <div class="stat-card purple">
-            <div class="stat-icon">📋</div>
-            <div class="stat-value" id="statLeases">-</div>
-            <div class="stat-label">Active Leases</div>
-        </div>
-        <div class="stat-card teal">
-            <div class="stat-icon">⚠️</div>
-            <div class="stat-value" id="statExpiring">-</div>
-            <div class="stat-label">Expiring in 90 Days</div>
-        </div>
-        <div class="stat-card pink">
-            <div class="stat-icon">🔧</div>
-            <div class="stat-value" id="statMaintenance">-</div>
-            <div class="stat-label">Open Maintenance</div>
-        </div>
-        <div class="stat-card gold">
-            <div class="stat-icon">📉</div>
-            <div class="stat-value" id="statArrears">-</div>
-            <div class="stat-label">Outstanding Amount</div>
-        </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="charts-grid">
-        <div class="chart-card">
-            <h3>Unit Status Breakdown</h3>
-            <div style="position:relative;height:260px;">
-                <canvas id="unitStatusChart"></canvas>
-            </div>
-        </div>
-        <div class="chart-card">
-            <h3>Monthly Revenue (6 Months)</h3>
-            <div style="position:relative;height:260px;">
-                <canvas id="revenueChart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div class="charts-grid">
-        <div class="chart-card">
-            <h3>Arrears Aging</h3>
-            <div style="position:relative;height:260px;">
-                <canvas id="agingChart"></canvas>
-            </div>
-        </div>
-        <div class="chart-card">
-            <h3>Maintenance by Priority</h3>
-            <div style="position:relative;height:260px;">
-                <canvas id="maintChart"></canvas>
-            </div>
-        </div>
-    </div>
+<!-- Dashboard will render different views based on user role -->
+<div id="dashboardContainer">
+    <div style="text-align:center;padding:40px;color:var(--text-secondary)">Loading dashboard...</div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const chartColors = {
-        purple: '#6c5ce7', teal: '#00cec9', pink: '#fd79a8',
-        gold: '#fdcb6e', blue: '#74b9ff', red: '#ff6b6b',
-        green: '#55efc4', gray: '#636e72'
-    };
-
-    Chart.defaults.color = '#9ca3bf';
-    Chart.defaults.borderColor = '#2d3250';
+    let userRole = '{{ role.role_name if role else "Admin" }}';
 
     async function loadDashboard() {
+        const container = document.getElementById('dashboardContainer');
+        const roleName = userRole.toLowerCase();
+
+        if (['admin', 'manager', 'super_admin'].includes(roleName)) {
+            await renderAdminDashboard(container);
+        } else if (roleName === 'owner') {
+            await renderOwnerDashboard(container);
+        } else if (roleName === 'tenant') {
+            await renderTenantDashboard(container);
+        } else if (roleName === 'vendor') {
+            await renderVendorDashboard(container);
+        } else if (roleName === 'accountant') {
+            await renderAccountantDashboard(container);
+        } else {
+            await renderAdminDashboard(container);
+        }
+    }
+
+    /* ═══════════════════════════ ADMIN / MANAGER DASHBOARD ═══════════════════════════ */
+    async function renderAdminDashboard(container) {
+        container.innerHTML = `
+            <div class="stats-grid" id="adminStats"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px">
+                <div class="card" style="padding:20px"><h4>Revenue Trend</h4><canvas id="revenueChart"></canvas></div>
+                <div class="card" style="padding:20px"><h4>Maintenance by Status</h4><canvas id="maintChart"></canvas></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+                <div class="card" style="padding:20px"><h4>Occupancy Overview</h4><canvas id="occChart"></canvas></div>
+                <div class="card" style="padding:20px"><h4>Recent Activity</h4><div id="recentActivity" style="max-height:250px;overflow-y:auto"></div></div>
+            </div>`;
+
         try {
             const [portfolio, finance, maint] = await Promise.all([
-                apiFetch('/api/dashboard/portfolio'),
-                apiFetch('/api/dashboard/finance'),
-                apiFetch('/api/dashboard/maintenance'),
+                apiFetch('/api/dashboard/portfolio').catch(() => ({})),
+                apiFetch('/api/dashboard/finance').catch(() => ({})),
+                apiFetch('/api/dashboard/maintenance').catch(() => ({}))
             ]);
 
-            // Stats
-            document.getElementById('statProperties').textContent = portfolio.total_properties;
-            document.getElementById('statUnits').textContent = portfolio.total_units;
-            document.getElementById('statOccupancy').textContent = portfolio.occupancy_rate + '%';
-            document.getElementById('statRevenue').textContent = formatCurrency(portfolio.total_revenue);
-            document.getElementById('statLeases').textContent = portfolio.active_leases;
-            document.getElementById('statExpiring').textContent = portfolio.expiring_leases_90d;
-            document.getElementById('statMaintenance').textContent = portfolio.open_maintenance_requests;
-            document.getElementById('statArrears').textContent = formatCurrency(portfolio.outstanding_amount);
+            // Stats cards
+            document.getElementById('adminStats').innerHTML = `
+                ${statCard('🏢', 'Properties', portfolio.total_properties || 0, 'var(--accent-primary)')}
+                ${statCard('🏠', 'Total Units', portfolio.total_units || 0, 'var(--accent-success)')}
+                ${statCard('📊', 'Occupancy', (portfolio.occupancy_rate || 0) + '%', '#f59e0b')}
+                ${statCard('💰', 'Revenue', '$' + formatNum(finance.total_revenue || 0), 'var(--accent-primary)')}
+                ${statCard('🔧', 'Open Requests', maint.open_requests || 0, 'var(--accent-danger)')}
+                ${statCard('⚡', 'SLA Breaches', maint.sla_breaches || 0, '#ef4444')}`;
 
-            // Unit Status Doughnut
-            const unitData = portfolio.unit_status_breakdown || {};
-            new Chart(document.getElementById('unitStatusChart'), {
+            // Revenue chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: (finance.monthly_labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']),
+                    datasets: [{
+                        label: 'Revenue', data: finance.monthly_revenue || [0, 0, 0, 0, 0, 0],
+                        borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, tension: 0.4
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+
+            // Maintenance chart
+            const maintCtx = document.getElementById('maintChart').getContext('2d');
+            new Chart(maintCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: Object.keys(unitData),
+                    labels: ['New', 'In Progress', 'Completed', 'Escalated'],
                     datasets: [{
-                        data: Object.values(unitData),
-                        backgroundColor: [chartColors.teal, chartColors.red, chartColors.gold, chartColors.blue, chartColors.gray],
-                        borderWidth: 0,
+                        data: [maint.new || 0, maint.in_progress || 0, maint.completed || 0, maint.escalated || 0],
+                        backgroundColor: ['#6366f1', '#f59e0b', '#10b981', '#ef4444']
                     }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right', labels: { padding: 16, usePointStyle: true } } },
-                    cutout: '65%',
-                }
+                options: { responsive: true }
             });
 
-            // Revenue Bar
-            const revData = finance.monthly_revenue || [];
-            new Chart(document.getElementById('revenueChart'), {
+            // Occupancy chart
+            const occCtx = document.getElementById('occChart').getContext('2d');
+            new Chart(occCtx, {
                 type: 'bar',
                 data: {
-                    labels: revData.map(r => r.month),
-                    datasets: [{
-                        label: 'Revenue', data: revData.map(r => r.revenue),
-                        backgroundColor: chartColors.purple + '99',
-                        borderColor: chartColors.purple, borderWidth: 1, borderRadius: 6,
-                    }]
+                    labels: portfolio.property_names || ['Prop A', 'Prop B'],
+                    datasets: [{ label: 'Occupied', data: portfolio.occupied_units || [0], backgroundColor: '#10b981' },
+                    { label: 'Vacant', data: portfolio.vacant_units || [0], backgroundColor: '#e5e7eb' }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, grid: { color: '#2d325033' } } }
-                }
+                options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } }
             });
 
-            // Aging
-            const aging = finance.aging_buckets || {};
-            new Chart(document.getElementById('agingChart'), {
+        } catch (e) { console.error('Dashboard error', e); }
+    }
+
+    /* ═══════════════════════════ OWNER DASHBOARD ═══════════════════════════ */
+    async function renderOwnerDashboard(container) {
+        container.innerHTML = `
+            <div class="stats-grid" id="ownerStats"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px">
+                <div class="card" style="padding:20px"><h4>My Properties Revenue</h4><canvas id="ownerRevChart"></canvas></div>
+                <div class="card" style="padding:20px"><h4>My Maintenance Requests</h4><div id="ownerMaintList" style="max-height:300px;overflow-y:auto"></div></div>
+            </div>`;
+
+        try {
+            const data = await apiFetch('/api/dashboard/owner').catch(() => ({}));
+            document.getElementById('ownerStats').innerHTML = `
+                ${statCard('🏢', 'My Properties', data.total_properties || 0, 'var(--accent-primary)')}
+                ${statCard('🏠', 'My Units', data.total_units || 0, 'var(--accent-success)')}
+                ${statCard('📊', 'Occupancy', (data.occupancy_rate || 0) + '%', '#f59e0b')}
+                ${statCard('💰', 'Monthly Revenue', '$' + formatNum(data.monthly_revenue || 0), '#10b981')}`;
+
+            const ctx = document.getElementById('ownerRevChart').getContext('2d');
+            new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(aging),
-                    datasets: [{
-                        label: 'Amount', data: Object.values(aging),
-                        backgroundColor: [chartColors.green, chartColors.gold, chartColors.pink, chartColors.red],
-                        borderWidth: 0, borderRadius: 6,
+                    labels: data.property_names || [], datasets: [{
+                        label: 'Revenue', data: data.property_revenues || [], backgroundColor: '#6366f1'
                     }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                options: { responsive: true }
             });
 
-            // Maintenance
-            const mp = maint.by_priority || {};
-            new Chart(document.getElementById('maintChart'), {
+            const maintDiv = document.getElementById('ownerMaintList');
+            const requests = data.recent_requests || [];
+            maintDiv.innerHTML = requests.length ? requests.map(r =>
+                `<div style="padding:8px 0;border-bottom:1px solid var(--border-color)">
+                    <strong>${r.request_number || '#' + r.id}</strong> — ${r.category || 'General'}
+                    <span class="badge badge-${r.status === 'Completed' ? 'success' : 'warning'}" style="float:right">${r.status}</span>
+                </div>`).join('') : '<p class="empty-state">No recent requests</p>';
+        } catch (e) { console.error(e); }
+    }
+
+    /* ═══════════════════════════ TENANT DASHBOARD ═══════════════════════════ */
+    async function renderTenantDashboard(container) {
+        container.innerHTML = `
+            <div class="stats-grid" id="tenantStats"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px">
+                <div class="card" style="padding:20px">
+                    <h4>My Lease</h4><div id="tenantLease" style="padding:12px 0"></div>
+                </div>
+                <div class="card" style="padding:20px">
+                    <h4>My Maintenance Requests</h4><div id="tenantMaint" style="max-height:300px;overflow-y:auto"></div>
+                </div>
+            </div>
+            <div class="card" style="padding:20px;margin-top:20px">
+                <h4>Payment History</h4><div id="tenantPayments" style="max-height:300px;overflow-y:auto"></div>
+            </div>`;
+
+        try {
+            const [maint, payments] = await Promise.all([
+                apiFetch('/api/maintenance/requests?limit=10').catch(() => ({ items: [] })),
+                apiFetch('/api/billing/invoices?limit=10').catch(() => ({ items: [] }))
+            ]);
+
+            document.getElementById('tenantStats').innerHTML = `
+                ${statCard('🔧', 'Open Requests', (maint.items || []).filter(r => r.status !== 'Completed').length, 'var(--accent-warning)')}
+                ${statCard('✅', 'Completed', (maint.items || []).filter(r => r.status === 'Completed').length, 'var(--accent-success)')}
+                ${statCard('📄', 'Pending Bills', (payments.items || []).filter(i => i.status !== 'Paid').length, 'var(--accent-danger)')}`;
+
+            const maintDiv = document.getElementById('tenantMaint');
+            maintDiv.innerHTML = (maint.items || []).length ? maint.items.map(r =>
+                `<div style="padding:8px 0;border-bottom:1px solid var(--border-color)">
+                    <strong>${r.request_number || '#' + r.id}</strong> — ${r.category || ''}
+                    <span class="badge badge-${r.status === 'Completed' ? 'success' : 'warning'}" style="float:right">${r.status}</span>
+                </div>`).join('') : '<p class="empty-state">No requests</p>';
+
+            const payDiv = document.getElementById('tenantPayments');
+            payDiv.innerHTML = (payments.items || []).length ? payments.items.map(i =>
+                `<div style="padding:8px 0;border-bottom:1px solid var(--border-color)">
+                    Invoice #${i.invoice_number || i.id} — $${formatNum(i.total_amount || 0)}
+                    <span class="badge badge-${i.status === 'Paid' ? 'success' : 'danger'}" style="float:right">${i.status}</span>
+                </div>`).join('') : '<p class="empty-state">No invoices</p>';
+
+            document.getElementById('tenantLease').innerHTML = '<p style="color:var(--text-secondary)">Lease info loaded from your profile.</p>';
+        } catch (e) { console.error(e); }
+    }
+
+    /* ═══════════════════════════ VENDOR DASHBOARD ═══════════════════════════ */
+    async function renderVendorDashboard(container) {
+        container.innerHTML = `
+            <div class="stats-grid" id="vendorStats"></div>
+            <div class="card" style="padding:20px;margin-top:24px">
+                <h4>My Work Orders</h4>
+                <div id="vendorWorkOrders" style="max-height:400px;overflow-y:auto"></div>
+            </div>`;
+
+        try {
+            const data = await apiFetch('/api/dashboard/vendor').catch(() => ({}));
+            document.getElementById('vendorStats').innerHTML = `
+                ${statCard('📋', 'Assigned', data.assigned || 0, 'var(--accent-primary)')}
+                ${statCard('🔄', 'In Progress', data.in_progress || 0, '#f59e0b')}
+                ${statCard('✅', 'Completed', data.completed || 0, 'var(--accent-success)')}
+                ${statCard('⭐', 'Avg Rating', (data.avg_rating || 0).toFixed(1), '#8b5cf6')}`;
+
+            const woDiv = document.getElementById('vendorWorkOrders');
+            const orders = data.work_orders || [];
+            woDiv.innerHTML = orders.length ? orders.map(w =>
+                `<div style="padding:10px 0;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between">
+                    <div><strong>WO-${w.id}</strong> — ${w.description || 'Work Order'}</div>
+                    <span class="badge badge-${w.status === 'Completed' ? 'success' : w.status === 'InProgress' ? 'warning' : 'info'}">${w.status}</span>
+                </div>`).join('') : '<p class="empty-state">No work orders assigned</p>';
+        } catch (e) { console.error(e); }
+    }
+
+    /* ═══════════════════════════ ACCOUNTANT DASHBOARD ═══════════════════════════ */
+    async function renderAccountantDashboard(container) {
+        container.innerHTML = `
+            <div class="stats-grid" id="acctStats"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px">
+                <div class="card" style="padding:20px"><h4>Revenue vs Expenses</h4><canvas id="acctChart"></canvas></div>
+                <div class="card" style="padding:20px"><h4>Invoice Aging</h4><canvas id="agingChart"></canvas></div>
+            </div>`;
+
+        try {
+            const finance = await apiFetch('/api/dashboard/finance').catch(() => ({}));
+            document.getElementById('acctStats').innerHTML = `
+                ${statCard('💰', 'Total Revenue', '$' + formatNum(finance.total_revenue || 0), 'var(--accent-primary)')}
+                ${statCard('📉', 'Total Expenses', '$' + formatNum(finance.total_expenses || 0), 'var(--accent-danger)')}
+                ${statCard('📊', 'Net Income', '$' + formatNum((finance.total_revenue || 0) - (finance.total_expenses || 0)), 'var(--accent-success)')}
+                ${statCard('📄', 'Unpaid Invoices', finance.unpaid_invoices || 0, '#f59e0b')}`;
+
+            const ctx = document.getElementById('acctChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: finance.monthly_labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [
+                        { label: 'Revenue', data: finance.monthly_revenue || [0], backgroundColor: '#10b981' },
+                        { label: 'Expenses', data: finance.monthly_expenses || [0], backgroundColor: '#ef4444' }
+                    ]
+                },
+                options: { responsive: true }
+            });
+
+            const agingCtx = document.getElementById('agingChart').getContext('2d');
+            new Chart(agingCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: Object.keys(mp),
+                    labels: ['Current', '30 Days', '60 Days', '90+ Days'],
                     datasets: [{
-                        data: Object.values(mp),
-                        backgroundColor: [chartColors.red, chartColors.pink, chartColors.gold, chartColors.blue, chartColors.gray],
-                        borderWidth: 0,
+                        data: finance.aging_buckets || [0, 0, 0, 0],
+                        backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444']
                     }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right', labels: { padding: 16, usePointStyle: true } } },
-                    cutout: '65%',
-                }
+                options: { responsive: true }
             });
-        } catch (err) {
-            console.error('Dashboard load error:', err);
-        }
+        } catch (e) { console.error(e); }
+    }
+
+    /* ═══════════════════════════ HELPERS ═══════════════════════════ */
+    function statCard(icon, label, value, color) {
+        return `<div class="stat-card" style="border-left:4px solid ${color}">
+            <div class="stat-icon" style="font-size:28px">${icon}</div>
+            <div class="stat-details"><div class="stat-value">${value}</div><div class="stat-label">${label}</div></div>
+        </div>`;
+    }
+
+    function formatNum(n) {
+        return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
     }
 
     loadDashboard();

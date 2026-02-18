@@ -13,66 +13,177 @@
                 <tr>
                     <th>Role Name</th>
                     <th>Description</th>
+                    <th>System</th>
+                    <th>Active</th>
                     <th>Permissions</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="roleTableBody">
                 <tr>
-                    <td colspan="4" class="empty-state">Loading roles...</td>
+                    <td colspan="6" class="empty-state">Loading roles...</td>
                 </tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- View Permissions Modal -->
-<div class="modal-backdrop" id="roleModal">
-    <div class="modal">
+<!-- Edit Permissions Modal -->
+<div class="modal-backdrop" id="permModal">
+    <div class="modal" style="max-width:700px">
         <div class="modal-header">
-            <h3>Role Permissions: <span id="roleNameDisplay"></span></h3>
-            <button class="modal-close" onclick="closeModal('roleModal')">&times;</button>
+            <h3>Edit Permissions: <span id="permRoleName"></span></h3>
+            <button class="modal-close" onclick="closeModal('permModal')">×</button>
         </div>
-        <div class="modal-body">
-            <pre id="permissionsJson"
-                style="background:var(--bg-primary);padding:16px;border-radius:var(--radius-sm);color:var(--accent-light);overflow:auto;max-height:400px;font-family:monospace;font-size:12px;"></pre>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px">
+                Toggle each permission on/off. Changes take effect when you click Save.
+            </p>
+            <div id="permToggles" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('permModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="savePermissions()">💾 Save Permissions</button>
         </div>
     </div>
 </div>
+
+<style>
+    .perm-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: var(--bg-primary);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .perm-toggle label {
+        font-size: 13px;
+        font-weight: 500;
+        text-transform: capitalize;
+        cursor: pointer;
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 42px;
+        height: 22px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--border-color);
+        border-radius: 22px;
+        transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+        content: "";
+        position: absolute;
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+        background: var(--accent-primary);
+    }
+
+    .toggle-switch input:checked+.toggle-slider:before {
+        transform: translateX(20px);
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    const ALL_PERMISSIONS = [
+        'properties', 'leases', 'maintenance', 'work_orders', 'billing', 'payments',
+        'tenants', 'owners', 'vendors', 'utilities', 'dashboard', 'reports', 'export',
+        'crm', 'marketing', 'compliance', 'workflow', 'automation', 'portfolio',
+        'accounting', 'users', 'system', 'admin', 'all'
+    ];
+    let editingRoleId = null;
+
     async function loadRoles() {
         try {
             const roles = await apiFetch('/api/auth/roles');
             renderRoles(roles);
-        } catch (e) {
-            showToast(e.message, 'error');
-        }
+        } catch (e) { showToast(e.message, 'error'); }
     }
 
     function renderRoles(roles) {
         const tbody = document.getElementById('roleTableBody');
-        tbody.innerHTML = roles.map(r => `
+        if (!roles.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No roles</td></tr>'; return; }
+        tbody.innerHTML = roles.map(r => {
+            const perms = r.permissions || {};
+            const activePerms = Object.entries(perms).filter(([k, v]) => v === true).map(([k]) => k);
+            const permSummary = activePerms.length > 3
+                ? activePerms.slice(0, 3).join(', ') + ` +${activePerms.length - 3} more`
+                : activePerms.join(', ') || 'None';
+            return `
             <tr>
                 <td><span class="badge badge-purple">${r.role_name}</span></td>
                 <td>${r.description || '-'}</td>
-                <td><code style="font-size:11px">${Object.keys(r.permissions || {}).join(', ')}</code></td>
+                <td>${r.is_system ? '✅' : '-'}</td>
+                <td><span class="badge badge-${r.is_active ? 'success' : 'secondary'}">${r.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td><code style="font-size:11px">${permSummary}</code></td>
                 <td>
-                    <button class="btn btn-secondary btn-sm" onclick='viewPerms(${JSON.stringify(r)})'>👁️ View Perms</button>
+                    <button class="btn btn-secondary btn-sm" onclick='editPerms(${JSON.stringify(r)})'>🔐 Edit Perms</button>
                 </td>
-            </tr>
+            </tr>`;
+        }).join('');
+    }
+
+    function editPerms(r) {
+        editingRoleId = r.id;
+        document.getElementById('permRoleName').textContent = r.role_name;
+        const perms = r.permissions || {};
+        const container = document.getElementById('permToggles');
+        container.innerHTML = ALL_PERMISSIONS.map(key => `
+            <div class="perm-toggle">
+                <label for="perm_${key}">${key.replace(/_/g, ' ')}</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="perm_${key}" data-perm="${key}" ${perms[key] ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                </div>
+            </div>
         `).join('');
+        document.getElementById('permModal').classList.add('active');
     }
 
-    function viewPerms(r) {
-        document.getElementById('roleNameDisplay').innerText = r.role_name;
-        document.getElementById('permissionsJson').innerText = JSON.stringify(r.permissions, null, 4);
-        document.getElementById('roleModal').classList.add('active');
+    async function savePermissions() {
+        const perms = {};
+        ALL_PERMISSIONS.forEach(key => {
+            const el = document.getElementById('perm_' + key);
+            if (el) perms[key] = el.checked;
+        });
+        try {
+            await apiFetch(`/api/auth/roles/${editingRoleId}`, {
+                method: 'PUT', body: JSON.stringify({ permissions: perms })
+            });
+            closeModal('permModal');
+            showToast('Permissions updated');
+            loadRoles();
+        } catch (e) { showToast(e.message, 'error'); }
     }
-
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
     loadRoles();
 </script>

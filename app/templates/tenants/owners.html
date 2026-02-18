@@ -102,19 +102,15 @@
 
 {% block scripts %}
 <script>
-    function openModal(id) {
-        document.getElementById(id).classList.add('active');
-    }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
     async function loadOwners() {
         const q = document.getElementById('searchInput').value;
         const url = `/api/owners?search=${encodeURIComponent(q)}`;
+        setTableState('ownersTable', 6, 'Loading owners...');
         try {
             const data = await apiFetch(url);
             const tbody = document.getElementById('ownersTable');
             if (!data.items.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No owners found</td></tr>';
+                setTableState('ownersTable', 6, 'No owners found');
                 return;
             }
             tbody.innerHTML = data.items.map(o => `
@@ -127,7 +123,10 @@
                     <td><button class="btn btn-sm btn-secondary">Edit</button></td>
                 </tr>
             `).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            setTableState('ownersTable', 6, 'Could not load owners');
+            showToast(e.message || 'Failed to load owners', 'error');
+        }
     }
 
     async function saveOwner() {

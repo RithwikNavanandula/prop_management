@@ -10,28 +10,20 @@
     <button class="tab-btn" onclick="openTab(event, 'tasks')">Tasks</button>
 </div>
 
-<!-- Inbox Tab -->
 <div id="inbox" class="tab-content" style="display:block;">
     <div class="grid-2" style="grid-template-columns: 1fr 2fr; gap: 20px; height: 600px;">
-        <!-- Thread List -->
-        <div class="card" style="overflow-y:auto;">
-            <div class="actions-bar" style="padding:10px; border-bottom:1px solid #333;">
-                <button class="btn btn-primary btn-sm btn-block" onclick="openModal('newThreadModal')">New
-                    Message</button>
+        <div class="card" style="overflow:hidden; display:flex; flex-direction:column;">
+            <div class="actions-bar" style="padding:12px; border-bottom:1px solid var(--border);">
+                <button class="btn btn-primary btn-sm btn-block" onclick="openModal('newThreadModal')">New Message</button>
             </div>
-            <div id="threadList" class="list-group">
-                <!-- Populated by JS -->
-            </div>
+            <div id="threadList" class="list-group" style="overflow-y:auto;"></div>
         </div>
-        <!-- Message View -->
         <div class="card" style="display:flex; flex-direction:column;">
-            <div id="messageHeader" style="padding:15px; border-bottom:1px solid #333; font-weight:bold;">
+            <div id="messageHeader" style="padding:15px; border-bottom:1px solid var(--border); font-weight:700;">
                 Select a conversation
             </div>
-            <div id="messageBody" style="flex:1; overflow-y:auto; padding:15px; background: rgba(0,0,0,0.2);">
-                <!-- Messages populate here -->
-            </div>
-            <div id="messageInput" style="padding:15px; border-top:1px solid #333; display:none;">
+            <div id="messageBody" style="flex:1; overflow-y:auto; padding:15px;"></div>
+            <div id="messageInput" style="padding:15px; border-top:1px solid var(--border); display:none;">
                 <form onsubmit="sendMessage(event)">
                     <div style="display:flex; gap:10px;">
                         <input type="text" name="body" class="form-control" placeholder="Type a message..." required>
@@ -43,12 +35,11 @@
     </div>
 </div>
 
-<!-- Contacts Tab -->
 <div id="contacts" class="tab-content">
     <div class="actions-bar">
         <div class="search-box">
             <i class="fas fa-search"></i>
-            <input type="text" id="contactSearch" placeholder="Search contacts...">
+            <input type="text" id="contactSearch" placeholder="Search contacts..." oninput="debouncedLoadContacts()">
         </div>
         <button class="btn btn-primary" onclick="openModal('addContactModal')">Add Contact</button>
     </div>
@@ -68,7 +59,6 @@
     </div>
 </div>
 
-<!-- Tasks Tab -->
 <div id="tasks" class="tab-content">
     <div class="actions-bar">
         <button class="btn btn-primary" onclick="openModal('addTaskModal')">New Task</button>
@@ -89,16 +79,174 @@
     </div>
 </div>
 
-<!-- Scripts -->
+<div class="modal-backdrop" id="newThreadModal">
+    <div class="modal" style="max-width:620px;">
+        <div class="modal-header">
+            <h3>Create Thread</h3>
+            <button class="modal-close" type="button" onclick="closeModal('newThreadModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="newThreadForm" onsubmit="saveThread(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Subject *</label>
+                        <input class="form-control" name="subject" required maxlength="300">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Thread Type</label>
+                        <select class="form-control" name="thread_type">
+                            <option value="General">General</option>
+                            <option value="Tenant">Tenant</option>
+                            <option value="Owner">Owner</option>
+                            <option value="Vendor">Vendor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-control" name="status">
+                            <option value="Open">Open</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Related Entity Type</label>
+                        <input class="form-control" name="related_entity_type" placeholder="Tenant, Lease, WorkOrder">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Related Entity ID</label>
+                        <input class="form-control" name="related_entity_id" type="number" min="1">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('newThreadModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('newThreadForm').requestSubmit()">Create</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addContactModal">
+    <div class="modal" style="max-width:620px;">
+        <div class="modal-header">
+            <h3>Add Contact</h3>
+            <button class="modal-close" type="button" onclick="closeModal('addContactModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="addContactForm" onsubmit="saveContact(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Name *</label>
+                        <input class="form-control" name="first_name" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name *</label>
+                        <input class="form-control" name="last_name" required maxlength="100">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" name="email" type="email" maxlength="255">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input class="form-control" name="phone" maxlength="50">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contact Type</label>
+                    <select class="form-control" name="contact_type">
+                        <option value="">Select type</option>
+                        <option value="Tenant">Tenant</option>
+                        <option value="Owner">Owner</option>
+                        <option value="Vendor">Vendor</option>
+                        <option value="Lead">Lead</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('addContactModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('addContactForm').requestSubmit()">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="addTaskModal">
+    <div class="modal" style="max-width:620px;">
+        <div class="modal-header">
+            <h3>Create Task</h3>
+            <button class="modal-close" type="button" onclick="closeModal('addTaskModal')">x</button>
+        </div>
+        <div class="modal-body">
+            <form id="addTaskForm" onsubmit="saveTask(event)">
+                <div class="form-group">
+                    <label class="form-label">Task Title *</label>
+                    <input class="form-control" name="title" required maxlength="300">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select class="form-control" name="priority">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-control" name="status">
+                            <option value="Open">Open</option>
+                            <option value="InProgress">InProgress</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Related Entity Type</label>
+                        <input class="form-control" name="related_entity_type" placeholder="Lease, WorkOrder, Contact">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Related Entity ID</label>
+                        <input class="form-control" name="related_entity_id" type="number" min="1">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" type="button" onclick="closeModal('addTaskModal')">Cancel</button>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('addTaskForm').requestSubmit()">Create</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     let currentThreadId = null;
+    let currentThreadSubject = "";
 
     function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; }
-        tablinks = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        const tabcontent = document.getElementsByClassName("tab-content");
+        for (let i = 0; i < tabcontent.length; i += 1) {
+            tabcontent[i].style.display = "none";
+        }
+        const tablinks = document.getElementsByClassName("tab-btn");
+        for (let i = 0; i < tablinks.length; i += 1) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
         document.getElementById(tabName).style.display = "block";
         evt.currentTarget.className += " active";
 
@@ -107,95 +255,161 @@
         if (tabName === 'tasks') loadTasks();
     }
 
+    function toIntOrNull(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const parsed = Number.parseInt(value, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function safeItems(data) {
+        if (data && Array.isArray(data.items)) return data.items;
+        return [];
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+        ));
+    }
+
+    let contactSearchTimer;
+    function debouncedLoadContacts() {
+        clearTimeout(contactSearchTimer);
+        contactSearchTimer = setTimeout(() => loadContacts(), 250);
+    }
+
     async function loadThreads() {
-        const resp = await fetch('/api/crm/threads');
-        const data = await resp.json();
         const list = document.getElementById('threadList');
-        list.innerHTML = '';
-        data.items.forEach(t => {
-            const div = document.createElement('div');
-            div.className = 'list-item';
-            div.style = "padding:10px; border-bottom:1px solid #333; cursor:pointer;";
-            div.innerHTML = `
-                <div style="font-weight:bold;">${t.subject}</div>
-                <div style="font-size:0.8em; color:#888;">${t.status} • ${new Date(t.created_at).toLocaleDateString()}</div>
-            `;
-            div.onclick = () => loadMessages(t.id, t.subject);
-            list.appendChild(div);
-        });
+        list.innerHTML = '<div class="empty-state"><p>Loading threads...</p></div>';
+        try {
+            const data = await apiFetch('/api/crm/threads');
+            const items = safeItems(data);
+            if (!items.length) {
+                list.innerHTML = '<div class="empty-state"><p>No threads yet</p></div>';
+                return;
+            }
+            list.innerHTML = items.map((t) => `
+                <button type="button" class="nav-item thread-item" data-thread-id="${t.id}"
+                    style="width:100%;border:none;background:transparent;text-align:left;border-radius:0;padding:12px 14px;border-bottom:1px solid var(--border);">
+                    <div style="font-weight:700;color:var(--text-primary)">${escapeHtml(t.subject || 'Untitled')}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">
+                        ${escapeHtml(t.status || 'Open')} • ${formatDate(t.created_at)}
+                    </div>
+                </button>
+            `).join('');
+            document.querySelectorAll('.thread-item').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const id = Number.parseInt(button.getAttribute('data-thread-id'), 10);
+                    const subject = button.querySelector('div')?.textContent || `Thread #${id}`;
+                    document.querySelectorAll('.thread-item').forEach((node) => node.classList.remove('active'));
+                    button.classList.add('active');
+                    loadMessages(id, subject);
+                });
+            });
+        } catch (error) {
+            list.innerHTML = '<div class="empty-state"><p>Could not load threads</p></div>';
+            showToast(error.message || 'Failed to load threads', 'error');
+        }
     }
 
     async function loadMessages(threadId, subject) {
         currentThreadId = threadId;
+        currentThreadSubject = subject;
         document.getElementById('messageHeader').innerText = subject;
         document.getElementById('messageInput').style.display = 'block';
 
-        const resp = await fetch(`/api/crm/threads/${threadId}/messages`);
-        const data = await resp.json();
         const body = document.getElementById('messageBody');
-        body.innerHTML = '';
-        data.items.forEach(m => {
-            body.innerHTML += `
+        body.innerHTML = '<div class="empty-state"><p>Loading messages...</p></div>';
+        try {
+            const data = await apiFetch(`/api/crm/threads/${threadId}/messages`);
+            const items = safeItems(data);
+            if (!items.length) {
+                body.innerHTML = '<div class="empty-state"><p>No messages in this thread yet</p></div>';
+                return;
+            }
+            body.innerHTML = items.map((m) => `
                 <div style="margin-bottom:10px; ${m.sender_type === 'User' ? 'text-align:right;' : ''}">
-                    <div style="display:inline-block; padding:8px 12px; background:${m.sender_type === 'User' ? '#007bff' : '#333'}; border-radius:10px;">
-                        ${m.body}
-                        <div style="font-size:0.7em; opacity:0.7; margin-top:4px;">${new Date(m.sent_at).toLocaleString()}</div>
+                    <div style="display:inline-block; padding:8px 12px; background:${m.sender_type === 'User' ? 'var(--accent)' : 'var(--bg-input)'}; color:${m.sender_type === 'User' ? '#ffffff' : 'var(--text-primary)'}; border-radius:10px; max-width:88%;">
+                        ${escapeHtml(m.body || '')}
+                        <div style="font-size:11px; opacity:0.75; margin-top:4px;">${formatDate(m.sent_at)}</div>
                     </div>
                 </div>
-            `;
-        });
-        body.scrollTop = body.scrollHeight;
+            `).join('');
+            body.scrollTop = body.scrollHeight;
+        } catch (error) {
+            body.innerHTML = '<div class="empty-state"><p>Could not load messages</p></div>';
+            showToast(error.message || 'Failed to load messages', 'error');
+        }
     }
 
     async function sendMessage(e) {
         e.preventDefault();
         if (!currentThreadId) return;
         const input = e.target.elements.body;
-        const body = input.value;
-
-        await fetch(`/api/crm/threads/${currentThreadId}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ body: body })
-        });
-        input.value = '';
-        loadMessages(currentThreadId, document.getElementById('messageHeader').innerText);
+        const body = (input.value || '').trim();
+        if (!body) return;
+        try {
+            await apiFetch(`/api/crm/threads/${currentThreadId}/messages`, {
+                method: 'POST',
+                body: JSON.stringify({ body })
+            });
+            input.value = '';
+            loadMessages(currentThreadId, currentThreadSubject || document.getElementById('messageHeader').innerText);
+        } catch (error) {
+            showToast(error.message || 'Failed to send message', 'error');
+        }
     }
 
     async function loadContacts() {
-        const resp = await fetch('/api/crm/contacts');
-        const data = await resp.json();
         const tbody = document.getElementById('contactList');
-        tbody.innerHTML = '';
-        data.items.forEach(c => {
-            tbody.innerHTML += `
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>Loading contacts...</p></td></tr>';
+        const search = (document.getElementById('contactSearch').value || '').trim();
+        const query = search ? `?search=${encodeURIComponent(search)}` : '';
+        try {
+            const data = await apiFetch(`/api/crm/contacts${query}`);
+            const items = safeItems(data);
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>No contacts found</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map((c) => `
                 <tr>
-                    <td>${c.first_name} ${c.last_name}</td>
-                    <td>${c.contact_type}</td>
-                    <td>${c.email}</td>
-                    <td>${c.phone || '-'}</td>
-                    <td>${c.status}</td>
+                    <td>${escapeHtml(`${c.first_name || ''} ${c.last_name || ''}`.trim() || '-')}</td>
+                    <td>${escapeHtml(c.contact_type || '-')}</td>
+                    <td>${escapeHtml(c.email || '-')}</td>
+                    <td>${escapeHtml(c.phone || '-')}</td>
+                    <td>${statusBadge(c.status || 'Active')}</td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>Could not load contacts</p></td></tr>';
+            showToast(error.message || 'Failed to load contacts', 'error');
+        }
     }
 
     async function loadTasks() {
-        const resp = await fetch('/api/crm/tasks');
-        const data = await resp.json();
         const tbody = document.getElementById('taskList');
-        tbody.innerHTML = '';
-        data.items.forEach(t => {
-            tbody.innerHTML += `
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>Loading tasks...</p></td></tr>';
+        try {
+            const data = await apiFetch('/api/crm/tasks');
+            const items = safeItems(data);
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>No tasks created yet</p></td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map((t) => `
                 <tr>
-                    <td>${t.title}</td>
-                    <td>${t.due_date ? new Date(t.due_date).toLocaleDateString() : '-'}</td>
-                    <td><span class="badge badge-${getPriorityColor(t.priority)}">${t.priority}</span></td>
-                    <td>${t.status}</td>
-                    <td>${t.assigned_to || '-'}</td>
+                    <td>${escapeHtml(t.title || '-')}</td>
+                    <td>${formatDate(t.due_date)}</td>
+                    <td><span class="badge badge-${getPriorityColor(t.priority)}">${escapeHtml(t.priority || 'Medium')}</span></td>
+                    <td>${statusBadge(t.status || 'Open')}</td>
+                    <td>${escapeHtml(String(t.assigned_to || '-'))}</td>
                 </tr>
-            `;
-        });
+            `).join('');
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><p>Could not load tasks</p></td></tr>';
+            showToast(error.message || 'Failed to load tasks', 'error');
+        }
     }
 
     function getPriorityColor(p) {
@@ -204,7 +418,80 @@
         return 'success';
     }
 
-    // Initial load
+    async function saveThread(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.subject = (payload.subject || '').trim();
+        payload.related_entity_id = toIntOrNull(payload.related_entity_id);
+        if (!payload.subject) {
+            showToast('Thread subject is required', 'error');
+            return;
+        }
+        Object.keys(payload).forEach((key) => {
+            if (payload[key] === '' || payload[key] === null) delete payload[key];
+        });
+        try {
+            await apiFetch('/api/crm/threads', { method: 'POST', body: JSON.stringify(payload) });
+            closeModal('newThreadModal');
+            form.reset();
+            showToast('Thread created');
+            loadThreads();
+        } catch (error) {
+            showToast(error.message || 'Failed to create thread', 'error');
+        }
+    }
+
+    async function saveContact(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.first_name = (payload.first_name || '').trim();
+        payload.last_name = (payload.last_name || '').trim();
+        if (!payload.first_name || !payload.last_name) {
+            showToast('First and last name are required', 'error');
+            return;
+        }
+        Object.keys(payload).forEach((key) => {
+            if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+            if (!payload[key]) delete payload[key];
+        });
+        try {
+            await apiFetch('/api/crm/contacts', { method: 'POST', body: JSON.stringify(payload) });
+            closeModal('addContactModal');
+            form.reset();
+            showToast('Contact added');
+            loadContacts();
+        } catch (error) {
+            showToast(error.message || 'Failed to add contact', 'error');
+        }
+    }
+
+    async function saveTask(event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        payload.title = (payload.title || '').trim();
+        payload.related_entity_id = toIntOrNull(payload.related_entity_id);
+        if (!payload.title) {
+            showToast('Task title is required', 'error');
+            return;
+        }
+        Object.keys(payload).forEach((key) => {
+            if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+            if (payload[key] === '' || payload[key] === null) delete payload[key];
+        });
+        try {
+            await apiFetch('/api/crm/tasks', { method: 'POST', body: JSON.stringify(payload) });
+            closeModal('addTaskModal');
+            form.reset();
+            showToast('Task created');
+            loadTasks();
+        } catch (error) {
+            showToast(error.message || 'Failed to create task', 'error');
+        }
+    }
+
     loadThreads();
 </script>
 {% endblock %}

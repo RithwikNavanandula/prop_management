@@ -103,13 +103,37 @@
         </div>
     </div>
 </div>
+
+<!-- Job Execution Logs Modal -->
+<div class="modal-backdrop" id="jobLogsModal">
+    <div class="modal" style="max-width:750px">
+        <div class="modal-header">
+            <h3>Execution Logs: <span id="logJobName"></span></h3>
+            <button class="modal-close" onclick="closeModal('jobLogsModal')">×</button>
+        </div>
+        <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Triggered At</th>
+                        <th>Status</th>
+                        <th>Completed At</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody id="jobLogTable">
+                    <tr>
+                        <td colspan="4">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    function openModal(id) { document.getElementById(id).classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
     function toggleScheduleFields() {
         const type = document.getElementById('scheduleType').value;
         document.getElementById('fieldCron').style.display = type === 'Cron' ? 'block' : 'none';
@@ -148,11 +172,12 @@
     }
 
     async function loadJobs() {
+        setTableState('jobsTable', 7, 'Loading scheduled jobs...');
         try {
             const data = await apiFetch('/api/workflow/jobs');
             const tbody = document.getElementById('jobsTable');
             if (!data.items || !data.items.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No scheduled jobs found</td></tr>';
+                setTableState('jobsTable', 7, 'No scheduled jobs found');
                 return;
             }
             tbody.innerHTML = data.items.map(j => `
@@ -166,12 +191,14 @@
                     <td style="white-space:nowrap">
                         <button class="btn btn-sm btn-secondary" onclick="editJob(${j.id})">✏️</button>
                         <button class="btn btn-sm btn-secondary" onclick="runNow(${j.id})">▶️</button>
+                        <button class="btn btn-sm btn-info" onclick="viewJobLogs(${j.id}, '${j.job_name}')">📋 Logs</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteJob(${j.id})">🗑️</button>
                     </td>
                 </tr>
             `).join('');
         } catch (e) {
-            document.getElementById('jobsTable').innerHTML = '<tr><td colspan="7">Error loading jobs</td></tr>';
+            setTableState('jobsTable', 7, 'Could not load scheduled jobs');
+            showToast(e.message || 'Failed to load jobs', 'error');
         }
     }
 
@@ -238,6 +265,31 @@
             showToast('Job deleted');
             loadJobs();
         } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function viewJobLogs(jobId, jobName) {
+        document.getElementById('logJobName').textContent = jobName;
+        setTableState('jobLogTable', 4, 'Loading logs...');
+        openModal('jobLogsModal');
+        try {
+            const data = await apiFetch(`/api/workflow/jobs/${jobId}/logs`);
+            if (!data.items || !data.items.length) {
+                setTableState('jobLogTable', 4, 'No logs found');
+                return;
+            }
+            const tbody = document.getElementById('jobLogTable');
+            tbody.innerHTML = data.items.map(l => `
+                <tr>
+                    <td>${new Date(l.triggered_at).toLocaleString()}</td>
+                    <td><span class="badge badge-${l.status === 'Completed' ? 'success' : l.status === 'Failed' ? 'danger' : 'warning'}">${l.status}</span></td>
+                    <td>${l.completed_at ? new Date(l.completed_at).toLocaleString() : '-'}</td>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${l.error_message || '-'}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            setTableState('jobLogTable', 4, 'Could not load logs');
+            showToast(e.message || 'Failed to load logs', 'error');
+        }
     }
 
     loadJobs();
