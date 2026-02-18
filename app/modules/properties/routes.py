@@ -13,7 +13,7 @@ from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.properties.models import (
     Property, Building, Floor, Unit, Asset, UnitAsset, Owner, Tenant, Vendor,
-    PropertyOwnerLink, Region, TenantOrg
+    PropertyOwnerLink, Region, TenantOrg, StaffUser
 )
 from app.utils.qrcode_service import generate_qr_code
 from app.modules.compliance.models import Document
@@ -787,6 +787,145 @@ def delete_tenant(tenant_id: int, db: Session = Depends(get_db), user: UserAccou
     return {"message": "Tenant deleted"}
 
 
+# --- Staff ---
+staff_router = APIRouter(
+    prefix="/api/staff",
+    tags=["Staff"],
+    dependencies=[Depends(require_permissions(["admin"]))],
+)
+
+
+@staff_router.get("")
+def list_staff(
+    search: Optional[str] = None,
+    role_id: Optional[int] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    q = db.query(StaffUser)
+    if user.tenant_org_id:
+        q = q.filter(StaffUser.tenant_org_id == user.tenant_org_id)
+    if search:
+        q = q.filter(or_(
+            StaffUser.employee_code.ilike(f"%{search}%"),
+            StaffUser.first_name.ilike(f"%{search}%"),
+            StaffUser.last_name.ilike(f"%{search}%"),
+            StaffUser.email.ilike(f"%{search}%"),
+            StaffUser.department.ilike(f"%{search}%"),
+        ))
+    if role_id:
+        q = q.filter(StaffUser.role_id == role_id)
+    if status:
+        q = q.filter(StaffUser.status == status)
+    total = q.count()
+    items = q.order_by(StaffUser.id.desc()).offset(skip).limit(limit).all()
+    return {"total": total, "items": [_staff_dict(s) for s in items]}
+
+
+@staff_router.post("", status_code=201)
+def create_staff(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    clean_data = _sanitize_model_payload(
+        StaffUser,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    if not clean_data.get("employee_code") or not clean_data.get("first_name"):
+        raise HTTPException(status_code=422, detail="employee_code and first_name are required")
+    duplicate = db.query(StaffUser).filter(
+        StaffUser.tenant_org_id == clean_data.get("tenant_org_id"),
+        StaffUser.employee_code == clean_data["employee_code"],
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="employee_code already exists")
+    staff = StaffUser(**clean_data)
+    db.add(staff)
+    db.commit()
+    db.refresh(staff)
+    return _staff_dict(staff)
+
+
+@staff_router.get("/{staff_id}")
+def get_staff(staff_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(StaffUser).filter(StaffUser.id == staff_id)
+    if user.tenant_org_id:
+        q = q.filter(StaffUser.tenant_org_id == user.tenant_org_id)
+    staff = q.first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    return _staff_dict(staff)
+
+
+@staff_router.put("/{staff_id}")
+def update_staff(staff_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(StaffUser).filter(StaffUser.id == staff_id)
+    if user.tenant_org_id:
+        q = q.filter(StaffUser.tenant_org_id == user.tenant_org_id)
+    staff = q.first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    clean_data = _sanitize_model_payload(
+        StaffUser,
+        data,
+        blocked_fields={"id", "created_at", "updated_at", "tenant_org_id"},
+    )
+    if "employee_code" in clean_data:
+        duplicate = db.query(StaffUser).filter(
+            StaffUser.id != staff.id,
+            StaffUser.tenant_org_id == staff.tenant_org_id,
+            StaffUser.employee_code == clean_data["employee_code"],
+        ).first()
+        if duplicate:
+            raise HTTPException(status_code=409, detail="employee_code already exists")
+
+    for k, v in clean_data.items():
+        setattr(staff, k, v)
+
+    # Keep linked user role in sync if staff role is changed.
+    if "role_id" in clean_data:
+        uq = db.query(UserAccount).filter(
+            UserAccount.linked_entity_type == "Staff",
+            UserAccount.linked_entity_id == staff.id,
+        )
+        if user.tenant_org_id:
+            uq = uq.filter(UserAccount.tenant_org_id == user.tenant_org_id)
+        for linked_user in uq.all():
+            linked_user.role_id = clean_data["role_id"]
+
+    db.commit()
+    db.refresh(staff)
+    return _staff_dict(staff)
+
+
+@staff_router.delete("/{staff_id}")
+def delete_staff(staff_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(StaffUser).filter(StaffUser.id == staff_id)
+    if user.tenant_org_id:
+        q = q.filter(StaffUser.tenant_org_id == user.tenant_org_id)
+    staff = q.first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    # Prefer soft delete to avoid breaking maintenance/work-order references.
+    staff.status = "Inactive"
+    uq = db.query(UserAccount).filter(
+        UserAccount.linked_entity_type == "Staff",
+        UserAccount.linked_entity_id == staff.id,
+    )
+    if user.tenant_org_id:
+        uq = uq.filter(UserAccount.tenant_org_id == user.tenant_org_id)
+    for linked_user in uq.all():
+        linked_user.is_active = False
+
+    db.commit()
+    return {"message": "Staff deactivated"}
+
+
 # --- Owners ---
 owners_router = APIRouter(
     prefix="/api/owners",
@@ -979,6 +1118,9 @@ def _asset_dict(a):
 
 def _tenant_dict(t):
     return {c.name: getattr(t, c.name) for c in t.__table__.columns}
+
+def _staff_dict(s):
+    return {c.name: getattr(s, c.name) for c in s.__table__.columns}
 
 def _owner_dict(o):
     return {c.name: getattr(o, c.name) for c in o.__table__.columns}

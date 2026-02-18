@@ -19,6 +19,8 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
     role_id: int = 2
+    tenant_org_id: Optional[int] = None
+    profile: Optional[dict] = None
     linked_entity_type: Optional[str] = None
     linked_entity_id: Optional[int] = None
 
@@ -37,6 +39,7 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 class UserUpdate(BaseModel):
+    username: Optional[str] = None
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role_id: Optional[int] = None

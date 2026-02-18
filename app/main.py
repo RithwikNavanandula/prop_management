@@ -15,7 +15,7 @@ from app.auth.models import UserAccount, Role
 from app.modules.properties.models import TenantOrg
 from app.modules.system.models import OrgSettings, Country, Currency
 from app.auth.routes import router as auth_router
-from app.modules.properties.routes import router as properties_router, tenants_router, owners_router, vendors_router
+from app.modules.properties.routes import router as properties_router, tenants_router, staff_router, owners_router, vendors_router
 from app.modules.properties.asset_routes import router as assets_router
 from app.modules.system.routes import router as system_router
 from app.modules.leasing.routes import router as leasing_router
@@ -220,6 +220,7 @@ app.include_router(auth_router)
 app.include_router(properties_router)
 app.include_router(system_router)
 app.include_router(tenants_router)
+app.include_router(staff_router)
 app.include_router(owners_router)
 app.include_router(vendors_router)
 app.include_router(leasing_router)
@@ -413,6 +414,19 @@ async def owners_page(request: Request, user: UserAccount = Depends(get_current_
     role = db.query(Role).filter(Role.id == user.role_id).first()
     return templates.TemplateResponse("tenants/owners.html", {
         "request": request, "user": user, "role": role, "settings": settings
+    })
+
+
+@app.get("/staff", response_class=HTMLResponse)
+async def staff_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
+                     db: Session = Depends(get_db)):
+    if not user:
+        return RedirectResponse(url="/login")
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    if role.id != 1:  # Admin only
+        return RedirectResponse(url="/dashboard")
+    return templates.TemplateResponse("auth/staff.html", {
+        "request": request, "user": user, "role": role, "settings": settings, "active_page": "staff"
     })
 
 

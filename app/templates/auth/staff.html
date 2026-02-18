@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Staff Master - {{ settings.APP_NAME }}{% endblock %}
+{% block page_title %}Staff Master{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="staffSearch" class="form-control" style="width:260px" placeholder="Search code, name, email..."
+            oninput="loadStaff()">
+        <select id="staffRoleFilter" class="form-control" style="width:180px" onchange="loadStaff()">
+            <option value="">All Staff Roles</option>
+        </select>
+        <select id="staffStatusFilter" class="form-control" style="width:160px" onchange="loadStaff()">
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+        </select>
+    </div>
+    <button class="btn btn-primary" onclick="openStaffModal()">+ Add Staff</button>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Employee Code</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Department</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="staffTableBody">
+                <tr><td colspan="8" class="empty-state">Loading staff...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="staffModal">
+    <div class="modal" style="max-width:760px">
+        <div class="modal-header">
+            <h3 id="staffModalTitle">Add Staff</h3>
+            <button class="modal-close" onclick="closeModal('staffModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="staffForm">
+                <input type="hidden" id="staffId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Employee Code*</label>
+                        <input class="form-control" name="employee_code" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role*</label>
+                        <select class="form-control" name="role_id" id="staffRoleSelect" required></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Name*</label>
+                        <input class="form-control" name="first_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        <input class="form-control" name="last_name">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" name="email" type="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input class="form-control" name="phone">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input class="form-control" name="department">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-control" name="status">
+                            <option>Active</option>
+                            <option>Inactive</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('staffModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveStaff()">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const STAFF_ROLE_IDS = new Set([1, 2, 6, 7]);
+    let allRoles = [];
+    let staffItems = [];
+
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function roleName(roleId) {
+        const role = allRoles.find(r => r.id === roleId);
+        return role ? role.role_name : '-';
+    }
+
+    async function loadRoles() {
+        const roles = await apiFetch('/api/auth/roles');
+        allRoles = (roles || []).filter(r => STAFF_ROLE_IDS.has(r.id));
+        const opts = allRoles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+        document.getElementById('staffRoleFilter').innerHTML = '<option value="">All Staff Roles</option>' + opts;
+        document.getElementById('staffRoleSelect').innerHTML = opts;
+    }
+
+    async function loadStaff() {
+        const q = document.getElementById('staffSearch').value.trim();
+        const roleId = document.getElementById('staffRoleFilter').value;
+        const status = document.getElementById('staffStatusFilter').value;
+        let url = '/api/staff?limit=200';
+        if (q) url += `&search=${encodeURIComponent(q)}`;
+        if (roleId) url += `&role_id=${encodeURIComponent(roleId)}`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+
+        setTableState('staffTableBody', 8, 'Loading staff...');
+        try {
+            const data = await apiFetch(url);
+            staffItems = data.items || [];
+            const tbody = document.getElementById('staffTableBody');
+            if (!staffItems.length) {
+                setTableState('staffTableBody', 8, 'No staff found');
+                return;
+            }
+            tbody.innerHTML = staffItems.map(s => `
+                <tr>
+                    <td><strong>${s.employee_code}</strong></td>
+                    <td>${(s.first_name || '')} ${(s.last_name || '')}</td>
+                    <td>${roleName(s.role_id)}</td>
+                    <td>${s.email || '-'}</td>
+                    <td>${s.phone || '-'}</td>
+                    <td>${s.department || '-'}</td>
+                    <td>${statusBadge(s.status || 'Active')}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="openStaffModal(${s.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deactivateStaff(${s.id})">Deactivate</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            setTableState('staffTableBody', 8, 'Failed to load staff');
+            showToast(e.message || 'Failed to load staff', 'error');
+        }
+    }
+
+    function openStaffModal(staffId = null) {
+        const form = document.getElementById('staffForm');
+        form.reset();
+        document.getElementById('staffId').value = '';
+        document.getElementById('staffModalTitle').textContent = 'Add Staff';
+        const roleSelect = document.getElementById('staffRoleSelect');
+        if (allRoles.length && !roleSelect.value) roleSelect.value = String(allRoles[0].id);
+
+        if (staffId) {
+            const staff = staffItems.find(s => s.id === staffId);
+            if (!staff) return;
+            document.getElementById('staffId').value = String(staff.id);
+            document.getElementById('staffModalTitle').textContent = `Edit ${staff.employee_code}`;
+            form.querySelector('[name="employee_code"]').value = staff.employee_code || '';
+            form.querySelector('[name="first_name"]').value = staff.first_name || '';
+            form.querySelector('[name="last_name"]').value = staff.last_name || '';
+            form.querySelector('[name="email"]').value = staff.email || '';
+            form.querySelector('[name="phone"]').value = staff.phone || '';
+            form.querySelector('[name="department"]').value = staff.department || '';
+            form.querySelector('[name="status"]').value = staff.status || 'Active';
+            if (staff.role_id) form.querySelector('[name="role_id"]').value = String(staff.role_id);
+        }
+        document.getElementById('staffModal').classList.add('active');
+    }
+
+    async function saveStaff() {
+        const form = document.getElementById('staffForm');
+        if (!form.reportValidity()) return;
+        const data = {};
+        new FormData(form).forEach((v, k) => { data[k] = (v || '').trim(); });
+        data.role_id = parseInt(data.role_id, 10);
+        const id = document.getElementById('staffId').value;
+        try {
+            const url = id ? `/api/staff/${id}` : '/api/staff';
+            await apiFetch(url, { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) });
+            closeModal('staffModal');
+            showToast(`Staff ${id ? 'updated' : 'created'} successfully`);
+            loadStaff();
+        } catch (e) {
+            showToast(e.message || 'Failed to save staff', 'error');
+        }
+    }
+
+    async function deactivateStaff(staffId) {
+        if (!confirm('Deactivate this staff profile and linked login account(s)?')) return;
+        try {
+            await apiFetch(`/api/staff/${staffId}`, { method: 'DELETE' });
+            showToast('Staff deactivated');
+            loadStaff();
+        } catch (e) {
+            showToast(e.message || 'Failed to deactivate staff', 'error');
+        }
+    }
+
+    async function init() {
+        try {
+            await loadRoles();
+            await loadStaff();
+        } catch (e) {
+            showToast(e.message || 'Failed to initialize staff page', 'error');
+        }
+    }
+
+    init();
+</script>
+{% endblock %}

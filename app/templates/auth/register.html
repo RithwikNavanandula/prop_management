@@ -51,6 +51,7 @@
                     <h2>{{ settings.APP_NAME }}</h2>
                     <p class="subtitle">Create Account</p>
                 </div>
+                <p class="login-help" style="margin-bottom:12px">Registration is admin-controlled after initial setup.</p>
 
                 <div id="registerError" class="login-error"></div>
                 <div id="registerSuccess" class="login-error"
@@ -79,7 +80,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Role</label>
-                        <select id="role_id" class="form-control">
+                        <select id="role_id" class="form-control" onchange="renderRoleProfileFields()">
                             <option value="2">Manager</option>
                             <option value="1">Admin</option>
                             <option value="3">Owner</option>
@@ -89,6 +90,7 @@
                             <option value="7">Support</option>
                         </select>
                     </div>
+                    <div id="roleProfileFields"></div>
                     <button type="submit" class="btn btn-primary btn-lg btn-block" id="registerBtn">Create Account</button>
                 </form>
 
@@ -98,6 +100,103 @@
     </div>
 
     <script>
+        function renderRoleProfileFields() {
+            const roleId = parseInt(document.getElementById('role_id').value, 10);
+            const wrap = document.getElementById('roleProfileFields');
+
+            if (roleId === 4) {
+                wrap.innerHTML = `
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Tenant Code*</label><input class="form-control" data-profile="tenant_code" required></div>
+                        <div class="form-group"><label class="form-label">Tenant Type</label><select class="form-control" data-profile="tenant_type"><option>Individual</option><option>Corporate</option></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">First Name*</label><input class="form-control" data-profile="first_name" required></div>
+                        <div class="form-group"><label class="form-label">Last Name</label><input class="form-control" data-profile="last_name"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Phone</label><input class="form-control" data-profile="phone"></div>
+                        <div class="form-group"><label class="form-label">ID Type</label><input class="form-control" data-profile="id_type"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">ID Number</label><input class="form-control" data-profile="id_number"></div>
+                `;
+                return;
+            }
+
+            if (roleId === 3) {
+                wrap.innerHTML = `
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Owner Code*</label><input class="form-control" data-profile="owner_code" required></div>
+                        <div class="form-group"><label class="form-label">Owner Type</label><select class="form-control" data-profile="owner_type" id="register_owner_type"><option>Individual</option><option>Corporate</option></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">First Name</label><input class="form-control" data-profile="first_name" id="register_owner_first_name"></div>
+                        <div class="form-group"><label class="form-label">Last Name</label><input class="form-control" data-profile="last_name"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Company Name</label><input class="form-control" data-profile="company_name" id="register_owner_company_name"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Phone</label><input class="form-control" data-profile="phone"></div>
+                        <div class="form-group"><label class="form-label">Tax ID</label><input class="form-control" data-profile="tax_id"></div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (roleId === 5) {
+                wrap.innerHTML = `
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Vendor Code*</label><input class="form-control" data-profile="vendor_code" required></div>
+                        <div class="form-group"><label class="form-label">Company Name*</label><input class="form-control" data-profile="company_name" required></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Contact Person</label><input class="form-control" data-profile="contact_person"></div>
+                        <div class="form-group"><label class="form-label">Phone</label><input class="form-control" data-profile="phone"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Service Category</label><input class="form-control" data-profile="service_category"></div>
+                        <div class="form-group"><label class="form-label">License Number</label><input class="form-control" data-profile="license_number"></div>
+                    </div>
+                `;
+                return;
+            }
+
+            wrap.innerHTML = `
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Employee Code*</label><input class="form-control" data-profile="employee_code" required></div>
+                    <div class="form-group"><label class="form-label">First Name*</label><input class="form-control" data-profile="first_name" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Last Name</label><input class="form-control" data-profile="last_name"></div>
+                    <div class="form-group"><label class="form-label">Department</label><input class="form-control" data-profile="department"></div>
+                </div>
+                <div class="form-group"><label class="form-label">Phone</label><input class="form-control" data-profile="phone"></div>
+            `;
+        }
+
+        function collectProfileData() {
+            const profile = {};
+            document.querySelectorAll('#roleProfileFields [data-profile]').forEach((el) => {
+                profile[el.getAttribute('data-profile')] = (el.value || '').trim();
+            });
+            return profile;
+        }
+
+        function validateRoleProfile(roleId, profile) {
+            if (roleId === 4) {
+                if (!profile.tenant_code || !profile.first_name) return 'Tenant requires tenant code and first name';
+            } else if (roleId === 3) {
+                if (!profile.owner_code) return 'Owner requires owner code';
+                const ownerType = (profile.owner_type || 'Individual').toLowerCase();
+                if (ownerType === 'corporate' && !profile.company_name) return 'Corporate owner requires company name';
+                if (ownerType !== 'corporate' && !profile.first_name) return 'Individual owner requires first name';
+            } else if (roleId === 5) {
+                if (!profile.vendor_code || !profile.company_name) return 'Vendor requires vendor code and company name';
+            } else {
+                if (!profile.employee_code || !profile.first_name) return 'Staff roles require employee code and first name';
+            }
+            return null;
+        }
+
         async function handleRegister(e) {
             e.preventDefault();
             const form = document.getElementById('registerForm');
@@ -108,11 +207,19 @@
             const okDiv = document.getElementById('registerSuccess');
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm_password').value;
+            const roleId = parseInt(document.getElementById('role_id').value, 10);
+            const profile = collectProfileData();
 
             errDiv.style.display = 'none';
             okDiv.style.display = 'none';
             if (password !== confirmPassword) {
                 errDiv.textContent = 'Passwords do not match';
+                errDiv.style.display = 'block';
+                return;
+            }
+            const profileError = validateRoleProfile(roleId, profile);
+            if (profileError) {
+                errDiv.textContent = profileError;
                 errDiv.style.display = 'block';
                 return;
             }
@@ -128,7 +235,8 @@
                         email: document.getElementById('email').value.trim(),
                         password,
                         full_name: document.getElementById('full_name').value.trim() || null,
-                        role_id: parseInt(document.getElementById('role_id').value, 10),
+                        role_id: roleId,
+                        profile,
                     }),
                 });
 
@@ -146,6 +254,8 @@
                 btn.disabled = false;
             }
         }
+
+        renderRoleProfileFields();
     </script>
 </body>
 
