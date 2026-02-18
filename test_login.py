@@ -1,6 +1,12 @@
-import requests
+import os
+import pytest
+
+if not os.getenv("RUN_INTEGRATION_TESTS"):
+    pytest.skip("Set RUN_INTEGRATION_TESTS=1 to run login integration tests.", allow_module_level=True)
 
 def test_login():
+    import requests
+
     base_url = "http://localhost:8000"
     creds = {"username": "admin", "password": "admin123"}
     

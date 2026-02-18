@@ -1,5 +1,10 @@
+import os
+import pytest
 import httpx
 import asyncio
+
+if not os.getenv("RUN_INTEGRATION_TESTS"):
+    pytest.skip("Set RUN_INTEGRATION_TESTS=1 to run login integration tests.", allow_module_level=True)
 
 async def test_login():
     base_url = "http://localhost:8000"

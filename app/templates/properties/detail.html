@@ -457,7 +457,17 @@
     }
 
     async function saveUnit() {
-        const d = {}; new FormData(document.getElementById('unitForm')).forEach((v, k) => { d[k] = v });
+        const form = document.getElementById('unitForm');
+        if (!form.reportValidity()) return;
+
+        const d = {};
+        new FormData(form).forEach((v, k) => { d[k] = v });
+        d.unit_number = (d.unit_number || '').trim();
+        if (!d.unit_number) {
+            showToast('Unit Number is required', 'error');
+            return;
+        }
+
         const editId = d.id ? parseInt(d.id, 10) : null;
         delete d.id;
 

@@ -91,9 +91,19 @@
     }
 
     async function saveTenant() {
-        const d = {}; new FormData(document.getElementById('tenantForm')).forEach((v, k) => { d[k] = v });
+        const form = document.getElementById('tenantForm');
+        if (!form.reportValidity()) return;
+        const d = {};
+        new FormData(form).forEach((v, k) => { d[k] = v });
+        d.tenant_code = (d.tenant_code || '').trim();
+        d.first_name = (d.first_name || '').trim();
+        if (!d.tenant_code || !d.first_name) {
+            showToast('Tenant code and first name are required', 'error');
+            return;
+        }
         try {
             await apiFetch('/api/tenants', { method: 'POST', body: JSON.stringify(d) });
+            form.reset();
             closeModal('addTenantModal');
             showToast('Tenant added');
             loadTenants();

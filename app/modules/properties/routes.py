@@ -5,6 +5,7 @@ import io
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from decimal import Decimal, InvalidOperation
 from app.database import get_db
@@ -231,13 +232,19 @@ def create_unit(prop_id: int, data: dict, db: Session = Depends(get_db), user: U
         data,
         blocked_fields={"id", "created_at", "updated_at", "property_id", "created_by", "updated_by"},
     )
+    if not unit_data.get("unit_number"):
+        raise HTTPException(status_code=422, detail="unit_number is required")
     if user.tenant_org_id:
         unit_data["tenant_org_id"] = user.tenant_org_id
     unit = Unit(**unit_data)
     unit.property_id = prop_id
     unit.created_by = user.id
     db.add(unit)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=f"Invalid unit payload: {exc.orig}") from exc
     db.refresh(unit)
     return _unit_dict(unit)
 
@@ -720,7 +727,14 @@ def list_tenants(search: Optional[str] = None, skip: int = 0, limit: int = 50,
 
 @tenants_router.post("", status_code=201)
 def create_tenant(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    tenant = Tenant(**{k: v for k, v in data.items() if hasattr(Tenant, k)})
+    clean_data = _sanitize_model_payload(
+        Tenant,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    tenant = Tenant(**clean_data)
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
@@ -729,7 +743,10 @@ def create_tenant(data: dict, db: Session = Depends(get_db), user: UserAccount =
 
 @tenants_router.get("/{tenant_id}")
 def get_tenant(tenant_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    t = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    q = db.query(Tenant).filter(Tenant.id == tenant_id, Tenant.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Tenant.tenant_org_id == user.tenant_org_id)
+    t = q.first()
     if not t:
         raise HTTPException(404, "Tenant not found")
     return _tenant_dict(t)
@@ -737,12 +754,21 @@ def get_tenant(tenant_id: int, db: Session = Depends(get_db), user: UserAccount 
 
 @tenants_router.put("/{tenant_id}")
 def update_tenant(tenant_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    t = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    q = db.query(Tenant).filter(Tenant.id == tenant_id, Tenant.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Tenant.tenant_org_id == user.tenant_org_id)
+    t = q.first()
     if not t:
         raise HTTPException(404, "Tenant not found")
-    for k, v in data.items():
-        if hasattr(t, k) and k not in ("id", "created_at"):
-            setattr(t, k, v)
+    clean_data = _sanitize_model_payload(
+        Tenant,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    for k, v in clean_data.items():
+        setattr(t, k, v)
     db.commit()
     db.refresh(t)
     return _tenant_dict(t)
@@ -750,7 +776,10 @@ def update_tenant(tenant_id: int, data: dict, db: Session = Depends(get_db), use
 
 @tenants_router.delete("/{tenant_id}")
 def delete_tenant(tenant_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    t = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    q = db.query(Tenant).filter(Tenant.id == tenant_id, Tenant.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Tenant.tenant_org_id == user.tenant_org_id)
+    t = q.first()
     if not t:
         raise HTTPException(404, "Tenant not found")
     t.is_deleted = True
@@ -777,7 +806,14 @@ def list_owners(db: Session = Depends(get_db), user: UserAccount = Depends(get_c
 
 @owners_router.post("", status_code=201)
 def create_owner(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    owner = Owner(**{k: v for k, v in data.items() if hasattr(Owner, k)})
+    clean_data = _sanitize_model_payload(
+        Owner,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    owner = Owner(**clean_data)
     db.add(owner)
     db.commit()
     db.refresh(owner)
@@ -786,7 +822,10 @@ def create_owner(data: dict, db: Session = Depends(get_db), user: UserAccount = 
 
 @owners_router.get("/{owner_id}")
 def get_owner(owner_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    o = db.query(Owner).filter(Owner.id == owner_id, Owner.is_deleted == False).first()
+    q = db.query(Owner).filter(Owner.id == owner_id, Owner.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Owner.tenant_org_id == user.tenant_org_id)
+    o = q.first()
     if not o:
         raise HTTPException(404, "Owner not found")
     return _owner_dict(o)
@@ -794,12 +833,21 @@ def get_owner(owner_id: int, db: Session = Depends(get_db), user: UserAccount = 
 
 @owners_router.put("/{owner_id}")
 def update_owner(owner_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    o = db.query(Owner).filter(Owner.id == owner_id).first()
+    q = db.query(Owner).filter(Owner.id == owner_id, Owner.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Owner.tenant_org_id == user.tenant_org_id)
+    o = q.first()
     if not o:
         raise HTTPException(404, "Owner not found")
-    for k, v in data.items():
-        if hasattr(o, k) and k not in ("id", "created_at"):
-            setattr(o, k, v)
+    clean_data = _sanitize_model_payload(
+        Owner,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    for k, v in clean_data.items():
+        setattr(o, k, v)
     db.commit()
     db.refresh(o)
     return _owner_dict(o)
@@ -807,7 +855,10 @@ def update_owner(owner_id: int, data: dict, db: Session = Depends(get_db), user:
 
 @owners_router.delete("/{owner_id}")
 def delete_owner(owner_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    o = db.query(Owner).filter(Owner.id == owner_id).first()
+    q = db.query(Owner).filter(Owner.id == owner_id, Owner.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Owner.tenant_org_id == user.tenant_org_id)
+    o = q.first()
     if not o:
         raise HTTPException(404, "Owner not found")
     o.is_deleted = True
@@ -834,7 +885,14 @@ def list_vendors(db: Session = Depends(get_db), user: UserAccount = Depends(get_
 
 @vendors_router.post("", status_code=201)
 def create_vendor(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    vendor = Vendor(**{k: v for k, v in data.items() if hasattr(Vendor, k)})
+    clean_data = _sanitize_model_payload(
+        Vendor,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    vendor = Vendor(**clean_data)
     db.add(vendor)
     db.commit()
     db.refresh(vendor)
@@ -843,7 +901,10 @@ def create_vendor(data: dict, db: Session = Depends(get_db), user: UserAccount =
 
 @vendors_router.get("/{vendor_id}")
 def get_vendor(vendor_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    v = db.query(Vendor).filter(Vendor.id == vendor_id, Vendor.is_deleted == False).first()
+    q = db.query(Vendor).filter(Vendor.id == vendor_id, Vendor.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Vendor.tenant_org_id == user.tenant_org_id)
+    v = q.first()
     if not v:
         raise HTTPException(404, "Vendor not found")
     return _v_dict(v)
@@ -851,12 +912,21 @@ def get_vendor(vendor_id: int, db: Session = Depends(get_db), user: UserAccount 
 
 @vendors_router.put("/{vendor_id}")
 def update_vendor(vendor_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    v = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    q = db.query(Vendor).filter(Vendor.id == vendor_id, Vendor.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Vendor.tenant_org_id == user.tenant_org_id)
+    v = q.first()
     if not v:
         raise HTTPException(404, "Vendor not found")
-    for k, v_val in data.items():
-        if hasattr(v, k) and k not in ("id", "created_at"):
-            setattr(v, k, v_val)
+    clean_data = _sanitize_model_payload(
+        Vendor,
+        data,
+        blocked_fields={"id", "created_at", "updated_at"},
+    )
+    if user.tenant_org_id:
+        clean_data["tenant_org_id"] = user.tenant_org_id
+    for k, v_val in clean_data.items():
+        setattr(v, k, v_val)
     db.commit()
     db.refresh(v)
     return _v_dict(v)
@@ -864,7 +934,10 @@ def update_vendor(vendor_id: int, data: dict, db: Session = Depends(get_db), use
 
 @vendors_router.delete("/{vendor_id}")
 def delete_vendor(vendor_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    v = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    q = db.query(Vendor).filter(Vendor.id == vendor_id, Vendor.is_deleted == False)
+    if user.tenant_org_id:
+        q = q.filter(Vendor.tenant_org_id == user.tenant_org_id)
+    v = q.first()
     if not v:
         raise HTTPException(404, "Vendor not found")
     v.is_deleted = True
