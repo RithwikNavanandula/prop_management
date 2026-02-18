@@ -140,8 +140,11 @@
         </div>
         <div class="modal-body">
             <form id="docForm">
-                <div class="form-group"><label class="form-label">File Name*</label>
-                    <input class="form-control" name="file_name" required>
+                <div class="form-group"><label class="form-label">File Name</label>
+                    <input class="form-control" name="file_name" placeholder="Optional if uploading a file">
+                </div>
+                <div class="form-group"><label class="form-label">Upload File</label>
+                    <input class="form-control" name="file_upload" id="docUploadFile" type="file">
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Owner Entity Type*</label>
@@ -287,7 +290,7 @@
             }
             tbody.innerHTML = data.items.map(d => `
                 <tr>
-                    <td>${d.file_name}</td>
+                    <td>${d.file_path ? `<a href="${d.file_path}" target="_blank" rel="noopener">${d.file_name || 'View document'}</a>` : (d.file_name || '-')}</td>
                     <td>${d.document_type_id || '-'}</td>
                     <td>${d.owner_entity_type} #${d.owner_entity_id}</td>
                     <td>${d.expiry_date || '-'}</td>
@@ -303,10 +306,27 @@
 
     async function saveDoc() {
         const d = {}; new FormData(document.getElementById('docForm')).forEach((v, k) => { if (v) d[k] = v; });
-        if (d.owner_entity_id) d.owner_entity_id = parseInt(d.owner_entity_id);
-        if (d.document_type_id) d.document_type_id = parseInt(d.document_type_id);
+        const fileInput = document.getElementById('docUploadFile');
+        const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
         try {
-            await apiFetch('/api/compliance/documents', { method: 'POST', body: JSON.stringify(d) });
+            if (!d.owner_entity_type || !d.owner_entity_id) {
+                throw new Error('Owner entity type and ID are required');
+            }
+
+            if (hasFile) {
+                const fd = new FormData();
+                fd.append('file', fileInput.files[0]);
+                fd.append('owner_entity_type', d.owner_entity_type);
+                fd.append('owner_entity_id', d.owner_entity_id);
+                if (d.document_type_id) fd.append('document_type_id', d.document_type_id);
+                if (d.expiry_date) fd.append('expiry_date', d.expiry_date);
+                await apiFetch('/api/compliance/documents/upload', { method: 'POST', body: fd });
+            } else {
+                if (!d.file_name) throw new Error('File Name is required when no file is uploaded');
+                if (d.owner_entity_id) d.owner_entity_id = parseInt(d.owner_entity_id);
+                if (d.document_type_id) d.document_type_id = parseInt(d.document_type_id);
+                await apiFetch('/api/compliance/documents', { method: 'POST', body: JSON.stringify(d) });
+            }
             closeModal('docModal'); showToast('Document added'); loadDocs();
         } catch (e) { showToast(e.message, 'error'); }
     }
@@ -362,5 +382,11 @@
 
     // Initial load
     loadReqs();
+    document.getElementById('docUploadFile')?.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const fileNameInput = document.querySelector('#docForm [name="file_name"]');
+        if (fileNameInput && !fileNameInput.value) fileNameInput.value = file.name;
+    });
 </script>
 {% endblock %}

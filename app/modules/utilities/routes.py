@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional
+from datetime import date
 from app.database import get_db
 from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
@@ -51,7 +52,10 @@ def list_readings(
 
 @router.get("/{reading_id}")
 def get_reading(reading_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    r = db.query(UtilityReading).filter(UtilityReading.id == reading_id).first()
+    q = db.query(UtilityReading).filter(UtilityReading.id == reading_id)
+    if user.tenant_org_id:
+        q = q.filter(UtilityReading.tenant_org_id == user.tenant_org_id)
+    r = q.first()
     if not r:
         raise HTTPException(404, "Reading not found")
     return _reading_dict(r)
@@ -62,6 +66,7 @@ def _sanitize_reading_data(data: dict) -> dict:
     clean = {}
     int_fields = {"property_id", "unit_id", "invoice_id"}
     float_fields = {"previous_reading", "current_reading", "usage", "rate_per_unit", "total_cost"}
+    date_fields = {"reading_date", "billing_period_start", "billing_period_end"}
     for k, v in data.items():
         if not hasattr(UtilityReading, k) or k in ("id", "created_at"):
             continue
@@ -77,6 +82,16 @@ def _sanitize_reading_data(data: dict) -> dict:
                 clean[k] = float(v)
             except (ValueError, TypeError):
                 clean[k] = 0
+        elif k in date_fields:
+            if isinstance(v, date):
+                clean[k] = v
+            elif isinstance(v, str):
+                try:
+                    clean[k] = date.fromisoformat(v)
+                except ValueError:
+                    raise HTTPException(400, f"Invalid date for '{k}'. Expected YYYY-MM-DD")
+            else:
+                raise HTTPException(400, f"Invalid date for '{k}'. Expected YYYY-MM-DD")
         else:
             clean[k] = v
     return clean
@@ -85,13 +100,18 @@ def _sanitize_reading_data(data: dict) -> dict:
 @router.post("", status_code=201)
 def create_reading(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
     clean = _sanitize_reading_data(data)
+    if not clean.get("utility_type"):
+        raise HTTPException(400, "Field 'utility_type' is required")
+    if not clean.get("reading_date"):
+        raise HTTPException(400, "Field 'reading_date' is required")
+
     r = UtilityReading(**clean)
     if user.tenant_org_id:
         r.tenant_org_id = user.tenant_org_id
     # Auto-calculate usage and total_cost
-    if r.current_reading and r.previous_reading:
+    if r.current_reading is not None and r.previous_reading is not None:
         r.usage = float(r.current_reading) - float(r.previous_reading)
-    if r.usage and r.rate_per_unit:
+    if r.usage is not None and r.rate_per_unit is not None:
         r.total_cost = float(r.usage) * float(r.rate_per_unit)
     db.add(r)
     db.commit()
@@ -101,16 +121,19 @@ def create_reading(data: dict, db: Session = Depends(get_db), user: UserAccount 
 
 @router.put("/{reading_id}")
 def update_reading(reading_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    r = db.query(UtilityReading).filter(UtilityReading.id == reading_id).first()
+    q = db.query(UtilityReading).filter(UtilityReading.id == reading_id)
+    if user.tenant_org_id:
+        q = q.filter(UtilityReading.tenant_org_id == user.tenant_org_id)
+    r = q.first()
     if not r:
         raise HTTPException(404, "Reading not found")
     clean = _sanitize_reading_data(data)
     for k, v in clean.items():
         setattr(r, k, v)
     # Recalculate
-    if r.current_reading and r.previous_reading:
+    if r.current_reading is not None and r.previous_reading is not None:
         r.usage = float(r.current_reading) - float(r.previous_reading)
-    if r.usage and r.rate_per_unit:
+    if r.usage is not None and r.rate_per_unit is not None:
         r.total_cost = float(r.usage) * float(r.rate_per_unit)
     db.commit()
     db.refresh(r)
@@ -119,7 +142,10 @@ def update_reading(reading_id: int, data: dict, db: Session = Depends(get_db), u
 
 @router.delete("/{reading_id}")
 def delete_reading(reading_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    r = db.query(UtilityReading).filter(UtilityReading.id == reading_id).first()
+    q = db.query(UtilityReading).filter(UtilityReading.id == reading_id)
+    if user.tenant_org_id:
+        q = q.filter(UtilityReading.tenant_org_id == user.tenant_org_id)
+    r = q.first()
     if not r:
         raise HTTPException(404, "Reading not found")
     db.delete(r)

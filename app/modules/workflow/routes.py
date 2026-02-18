@@ -1,8 +1,8 @@
 """Workflow API routes."""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 from app.database import get_db
 from app.auth.dependencies import get_current_user, require_permissions
@@ -43,6 +43,25 @@ class JobUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+def _workflow_query_for_user(db: Session, user: UserAccount):
+    q = db.query(WorkflowDefinition)
+    if user.tenant_org_id:
+        q = q.filter(WorkflowDefinition.tenant_org_id == user.tenant_org_id)
+    return q
+
+
+def _sanitize_workflow_data(data: dict) -> dict:
+    clean = {}
+    for k, v in data.items():
+        if not hasattr(WorkflowDefinition, k) or k in ("id", "created_at", "updated_at", "tenant_org_id"):
+            continue
+        if k == "is_active" and not isinstance(v, bool):
+            clean[k] = str(v).lower() in ("1", "true", "yes", "on")
+        else:
+            clean[k] = v
+    return clean
+
+
 # --- Definitions ---
 @router.get("/definitions")
 def list_workflows(
@@ -50,24 +69,58 @@ def list_workflows(
     db: Session = Depends(get_db),
     user: UserAccount = Depends(get_current_user)
 ):
-    q = db.query(WorkflowDefinition)
+    q = _workflow_query_for_user(db, user)
     if is_active is not None:
         q = q.filter(WorkflowDefinition.is_active == is_active)
-    if user.tenant_org_id:
-        q = q.filter(WorkflowDefinition.tenant_org_id == user.tenant_org_id)
         
     items = q.all()
     return {"total": len(items), "items": [_dict(x) for x in items]}
 
 @router.post("/definitions", status_code=201)
 def create_workflow(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    w = WorkflowDefinition(**{k: v for k, v in data.items() if hasattr(WorkflowDefinition, k)})
+    clean = _sanitize_workflow_data(data)
+    if not clean.get("workflow_name"):
+        raise HTTPException(400, "Field 'workflow_name' is required")
+    w = WorkflowDefinition(**clean)
     if user.tenant_org_id:
         w.tenant_org_id = user.tenant_org_id
     db.add(w)
     db.commit()
     db.refresh(w)
     return _dict(w)
+
+
+@router.get("/definitions/{workflow_id}")
+def get_workflow(workflow_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    w = _workflow_query_for_user(db, user).filter(WorkflowDefinition.id == workflow_id).first()
+    if not w:
+        raise HTTPException(404, "Workflow not found")
+    return _dict(w)
+
+
+@router.put("/definitions/{workflow_id}")
+def update_workflow(workflow_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    w = _workflow_query_for_user(db, user).filter(WorkflowDefinition.id == workflow_id).first()
+    if not w:
+        raise HTTPException(404, "Workflow not found")
+    clean = _sanitize_workflow_data(data)
+    for k, v in clean.items():
+        setattr(w, k, v)
+    if not w.workflow_name:
+        raise HTTPException(400, "Field 'workflow_name' is required")
+    db.commit()
+    db.refresh(w)
+    return _dict(w)
+
+
+@router.delete("/definitions/{workflow_id}")
+def delete_workflow(workflow_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    w = _workflow_query_for_user(db, user).filter(WorkflowDefinition.id == workflow_id).first()
+    if not w:
+        raise HTTPException(404, "Workflow not found")
+    db.delete(w)
+    db.commit()
+    return {"message": "Workflow deleted"}
 
 
 # --- Logs ---
@@ -113,8 +166,12 @@ def create_job(data: JobCreate, db: Session = Depends(get_db), user: UserAccount
 
 @router.put("/jobs/{job_id}")
 def update_job(job_id: int, data: JobUpdate, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    j = db.query(JobSchedule).filter(JobSchedule.id == job_id).first()
-    if not j: raise HTTPException(404, "Job not found")
+    q = db.query(JobSchedule).filter(JobSchedule.id == job_id)
+    if user.tenant_org_id:
+        q = q.filter(JobSchedule.tenant_org_id == user.tenant_org_id)
+    j = q.first()
+    if not j:
+        raise HTTPException(404, "Job not found")
     
     update_data = data.model_dump(exclude_unset=True)
     for k, v in update_data.items():
@@ -128,8 +185,12 @@ def update_job(job_id: int, data: JobUpdate, db: Session = Depends(get_db), user
 
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    j = db.query(JobSchedule).filter(JobSchedule.id == job_id).first()
-    if not j: raise HTTPException(404, "Job not found")
+    q = db.query(JobSchedule).filter(JobSchedule.id == job_id)
+    if user.tenant_org_id:
+        q = q.filter(JobSchedule.tenant_org_id == user.tenant_org_id)
+    j = q.first()
+    if not j:
+        raise HTTPException(404, "Job not found")
     # Deactivate in scheduler first
     j.is_active = False
     scheduler.add_or_update_job(j)
@@ -140,8 +201,12 @@ def delete_job(job_id: int, db: Session = Depends(get_db), user: UserAccount = D
 
 @router.post("/jobs/{job_id}/run")
 async def run_job_now(job_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    j = db.query(JobSchedule).filter(JobSchedule.id == job_id).first()
-    if not j: raise HTTPException(404, "Job not found")
+    q = db.query(JobSchedule).filter(JobSchedule.id == job_id)
+    if user.tenant_org_id:
+        q = q.filter(JobSchedule.tenant_org_id == user.tenant_org_id)
+    j = q.first()
+    if not j:
+        raise HTTPException(404, "Job not found")
     # Trigger manually in background
     await scheduler._execute_job_wrapper(job_id)
     return {"message": "Job triggered manually"}
@@ -149,7 +214,10 @@ async def run_job_now(job_id: int, db: Session = Depends(get_db), user: UserAcco
 
 @router.get("/jobs/{job_id}/logs")
 def get_job_logs(job_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
-    items = db.query(JobExecutionLog).filter(JobExecutionLog.job_id == job_id).order_by(JobExecutionLog.triggered_at.desc()).limit(50).all()
+    q = db.query(JobExecutionLog).filter(JobExecutionLog.job_id == job_id)
+    if user.tenant_org_id:
+        q = q.join(JobSchedule, JobExecutionLog.job_id == JobSchedule.id).filter(JobSchedule.tenant_org_id == user.tenant_org_id)
+    items = q.order_by(JobExecutionLog.triggered_at.desc()).limit(50).all()
     return {"total": len(items), "items": [_dict(x) for x in items]}
 
 

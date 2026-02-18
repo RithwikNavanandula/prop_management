@@ -496,6 +496,14 @@ async def workflow_page(request: Request, user: UserAccount = Depends(get_curren
     })
 
 
+@app.get("/workplace", response_class=HTMLResponse)
+@app.get("/workplace-management", response_class=HTMLResponse)
+async def workplace_page(request: Request, user: UserAccount = Depends(get_current_user_from_token)):
+    if not user:
+        return RedirectResponse(url="/login")
+    return RedirectResponse(url="/workflow")
+
+
 @app.get("/users", response_class=HTMLResponse)
 async def users_page(request: Request, user: UserAccount = Depends(get_current_user_from_token),
                      db: Session = Depends(get_db)):
