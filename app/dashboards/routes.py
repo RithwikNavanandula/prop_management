@@ -1,5 +1,6 @@
 """Dashboard analytics routes – KPIs for all role-based dashboards."""
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
