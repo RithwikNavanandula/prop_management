@@ -3,190 +3,346 @@
 {% block page_title %}System Settings{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h3>SMTP Configuration</h3>
-    </div>
-    <div class="card-body">
-        <p style="color:var(--text-secondary); margin-bottom: 20px;">
-            The following SMTP settings are currently active in your configuration. To change these, please update your
-            <code>.env</code> file and restart the server.
-        </p>
+<div class="tabs">
+    <button class="tab-btn active" onclick="openSettingsTab(event, 'general')">General</button>
+    <button class="tab-btn" onclick="openSettingsTab(event, 'policy')">Policy Engine</button>
+    <button class="tab-btn" onclick="openSettingsTab(event, 'outbox')">Event Outbox</button>
+    <button class="tab-btn" onclick="openSettingsTab(event, 'kpi')">KPI Mart</button>
+</div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">SMTP Server</div>
-                <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_SERVER }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Port</div>
-                <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_PORT }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">From Email</div>
-                <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_FROM_EMAIL }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">TLS Enabled</div>
-                <div class="stat-value" style="font-size: 16px;">{{ 'Yes' if settings.SMTP_TLS else 'No' }}</div>
-            </div>
+<div id="general" class="tab-content" style="display:block;">
+    <div class="card">
+        <div class="card-header">
+            <h3>SMTP Configuration</h3>
         </div>
-
-        <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 20px;">
-            <h3>Appearance</h3>
+        <div class="card-body">
             <p style="color:var(--text-secondary); margin-bottom: 20px;">
-                Choose your preferred interface style.
+                The following SMTP settings are currently active in your configuration. To change these, please update your
+                <code>.env</code> file and restart the server.
             </p>
 
-            <div class="theme-grid">
-                <div class="theme-tile" onclick="setTheme('dark-midnight')" id="theme-dark-midnight">
-                    <div class="theme-preview" style="background: #0f1117;">
-                        <div style="width:20%; height:100%; background:#1a1d2e; border-right:1px solid #2d3250"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#1e2235; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#2d3250; border-radius:2px"></div>
-                        </div>
-                    </div>
-                    <div class="theme-label">Midnight (Dark)</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">SMTP Server</div>
+                    <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_SERVER }}</div>
                 </div>
-
-                <div class="theme-tile" onclick="setTheme('dark-white')" id="theme-dark-white">
-                    <div class="theme-preview" style="background: #ffffff;">
-                        <div style="width:20%; height:100%; background:#1a1d2e; border-right:1px solid #e2e8f0"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#f1f5f9; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#e2e8f0; border-radius:2px"></div>
-                        </div>
-                    </div>
-                    <div class="theme-label">Corporate Mixed</div>
+                <div class="stat-card">
+                    <div class="stat-label">Port</div>
+                    <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_PORT }}</div>
                 </div>
-
-                <div class="theme-tile" onclick="setTheme('light-minimal')" id="theme-light-minimal">
-                    <div class="theme-preview" style="background: #ffffff; border:1px solid #e2e8f0">
-                        <div style="width:20%; height:100%; background:#f8fafc; border-right:1px solid #e2e8f0"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#f1f5f9; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#e2e8f0; border-radius:2px"></div>
-                        </div>
-                    </div>
-                    <div class="theme-label">Minimalist Light</div>
+                <div class="stat-card">
+                    <div class="stat-label">From Email</div>
+                    <div class="stat-value" style="font-size: 16px;">{{ settings.SMTP_FROM_EMAIL }}</div>
                 </div>
-
-                <div class="theme-tile" onclick="setTheme('light-ocean')" id="theme-light-ocean">
-                    <div class="theme-preview" style="background: #f0f9ff; border:1px solid #bae6fd">
-                        <div style="width:20%; height:100%; background:#e0f2fe; border-right:1px solid #bae6fd"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#ffffff; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#bae6fd; border-radius:2px"></div>
-                        </div>
-                    </div>
-                    <div class="theme-label">Ocean Breeze</div>
+                <div class="stat-card">
+                    <div class="stat-label">TLS Enabled</div>
+                    <div class="stat-value" style="font-size: 16px;">{{ 'Yes' if settings.SMTP_TLS else 'No' }}</div>
                 </div>
+            </div>
 
-                <div class="theme-tile" onclick="setTheme('dark-oled')" id="theme-dark-oled">
-                    <div class="theme-preview" style="background: #000000;">
-                        <div style="width:20%; height:100%; background:#000000; border-right:1px solid #222"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#0a0a0a; border-radius:2px; margin-bottom:4px">
+            <div style="margin-top: 40px; border-top: 1px solid var(--border); padding-top: 20px;">
+                <h3>Appearance</h3>
+                <p style="color:var(--text-secondary); margin-bottom: 20px;">
+                    Choose your preferred interface style.
+                </p>
+
+                <div class="theme-grid">
+                    <div class="theme-tile" onclick="setTheme('dark-midnight')" id="theme-dark-midnight">
+                        <div class="theme-preview" style="background: #0f1117;">
+                            <div style="width:20%; height:100%; background:#1a1d2e; border-right:1px solid #2d3250"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#1e2235; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#2d3250; border-radius:2px"></div>
                             </div>
-                            <div style="width:40%; height:4px; background:#222; border-radius:2px"></div>
                         </div>
+                        <div class="theme-label">Midnight (Dark)</div>
                     </div>
-                    <div class="theme-label">Deep Black (OLED)</div>
+
+                    <div class="theme-tile" onclick="setTheme('dark-white')" id="theme-dark-white">
+                        <div class="theme-preview" style="background: #ffffff;">
+                            <div style="width:20%; height:100%; background:#1a1d2e; border-right:1px solid #e2e8f0"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#f1f5f9; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#e2e8f0; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Corporate Mixed</div>
+                    </div>
+
+                    <div class="theme-tile" onclick="setTheme('light-minimal')" id="theme-light-minimal">
+                        <div class="theme-preview" style="background: #ffffff; border:1px solid #e2e8f0">
+                            <div style="width:20%; height:100%; background:#f8fafc; border-right:1px solid #e2e8f0"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#f1f5f9; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#e2e8f0; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Minimalist Light</div>
+                    </div>
+
+                    <div class="theme-tile" onclick="setTheme('light-ocean')" id="theme-light-ocean">
+                        <div class="theme-preview" style="background: #f0f9ff; border:1px solid #bae6fd">
+                            <div style="width:20%; height:100%; background:#e0f2fe; border-right:1px solid #bae6fd"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#ffffff; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#bae6fd; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Ocean Breeze</div>
+                    </div>
+
+                    <div class="theme-tile" onclick="setTheme('dark-oled')" id="theme-dark-oled">
+                        <div class="theme-preview" style="background: #000000;">
+                            <div style="width:20%; height:100%; background:#000000; border-right:1px solid #222"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#0a0a0a; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#222; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Deep Black (OLED)</div>
+                    </div>
+
+                    <div class="theme-tile" onclick="setTheme('dark-slate')" id="theme-dark-slate">
+                        <div class="theme-preview" style="background: #1e293b;">
+                            <div style="width:20%; height:100%; background:#0f172a; border-right:1px solid #334155"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#d4af37; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#475569; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Slate & Gold</div>
+                    </div>
+
+                    <div class="theme-tile" onclick="setTheme('light-cloud')" id="theme-light-cloud">
+                        <div class="theme-preview" style="background: #f1f5f9; border:1px solid #e2e8f0">
+                            <div style="width:20%; height:100%; background:#ffffff; border-right:1px solid #e2e8f0"></div>
+                            <div style="flex:1; padding:8px">
+                                <div style="width:60%; height:6px; background:#64748b; border-radius:2px; margin-bottom:4px"></div>
+                                <div style="width:40%; height:4px; background:#cbd5e1; border-radius:2px"></div>
+                            </div>
+                        </div>
+                        <div class="theme-label">Cloud Gray</div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="theme-tile" onclick="setTheme('dark-slate')" id="theme-dark-slate">
-                    <div class="theme-preview" style="background: #1e293b;">
-                        <div style="width:20%; height:100%; background:#0f172a; border-right:1px solid #334155"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#d4af37; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#475569; border-radius:2px"></div>
-                        </div>
-                    </div>
-                    <div class="theme-label">Slate & Gold</div>
-                </div>
+            <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+                <h4>Test SMTP Connection</h4>
+                <p style="color:var(--text-secondary);">Enter a recipient email address to send a test message using these settings.</p>
 
-                <div class="theme-tile" onclick="setTheme('light-cloud')" id="theme-light-cloud">
-                    <div class="theme-preview" style="background: #f1f5f9; border:1px solid #e2e8f0">
-                        <div style="width:20%; height:100%; background:#ffffff; border-right:1px solid #e2e8f0"></div>
-                        <div style="flex:1; padding:8px">
-                            <div
-                                style="width:60%; height:6px; background:#64748b; border-radius:2px; margin-bottom:4px">
-                            </div>
-                            <div style="width:40%; height:4px; background:#cbd5e1; border-radius:2px"></div>
-                        </div>
+                <div class="form-row" style="max-width: 500px; margin-top: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Recipient Email</label>
+                        <input type="email" id="testRecipient" class="form-control" placeholder="your-email@example.com" value="{{ user.email }}">
                     </div>
-                    <div class="theme-label">Cloud Gray</div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button class="btn btn-primary" onclick="sendTestEmail()" id="testBtn">Send Test Email</button>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <style>
-            .theme-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-                gap: 20px;
-                margin-top: 15px;
-            }
-
-            .theme-tile {
-                cursor: pointer;
-                border-radius: var(--radius-md);
-                overflow: hidden;
-                transition: var(--transition);
-                border: 2px solid transparent;
-            }
-
-            .theme-tile:hover {
-                transform: translateY(-3px);
-            }
-
-            .theme-tile.active {
-                border-color: var(--accent);
-                background: rgba(108, 92, 231, 0.05);
-            }
-
-            .theme-preview {
-                height: 100px;
-                display: flex;
-                border-radius: var(--radius-sm);
-                overflow: hidden;
-                margin-bottom: 8px;
-            }
-
-            .theme-label {
-                text-align: center;
-                font-size: 13px;
-                font-weight: 600;
-                padding: 4px;
-            }
-        </style>
-
-        <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
-            <h4>Test SMTP Connection</h4>
-            <p style="color:var(--text-secondary);">Enter a recipient email address to send a test message using these
-                settings.</p>
-
-            <div class="form-row" style="max-width: 500px; margin-top: 15px;">
-                <div class="form-group" style="flex: 1;">
-                    <label class="form-label">Recipient Email</label>
-                    <input type="email" id="testRecipient" class="form-control" placeholder="your-email@example.com"
-                        value="{{ user.email }}">
+<div id="policy" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h3>Country Policy Engine</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Country Filter</label>
+                    <input id="policyFilterCountry" class="form-control" placeholder="e.g. US">
                 </div>
-                <div class="form-group" style="align-self: flex-end;">
-                    <button class="btn btn-primary" onclick="sendTestEmail()" id="testBtn">📧 Send Test Email</button>
+                <div class="form-group">
+                    <label class="form-label">Area Filter</label>
+                    <select id="policyFilterArea" class="form-control">
+                        <option value="">All</option>
+                        <option value="tax">tax</option>
+                        <option value="legal">legal</option>
+                        <option value="workflow">workflow</option>
+                        <option value="compliance">compliance</option>
+                    </select>
                 </div>
+                <div class="form-group" style="align-self:flex-end">
+                    <button class="btn btn-secondary" type="button" onclick="loadPolicies()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Country Code*</label>
+                    <input id="policyCountryCode" class="form-control" maxlength="2" placeholder="US">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">State Code</label>
+                    <input id="policyStateCode" class="form-control" placeholder="CA">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Policy Area*</label>
+                    <select id="policyArea" class="form-control">
+                        <option value="tax">tax</option>
+                        <option value="legal">legal</option>
+                        <option value="workflow">workflow</option>
+                        <option value="compliance">compliance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <input id="policyPriority" class="form-control" type="number" value="100">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Entity Type*</label>
+                    <input id="policyEntityType" class="form-control" placeholder="Invoice">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Action Name*</label>
+                    <input id="policyActionName" class="form-control" placeholder="post_invoice">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Effective From</label>
+                    <input id="policyEffectiveFrom" class="form-control" type="date">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Effective To</label>
+                    <input id="policyEffectiveTo" class="form-control" type="date">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Rules JSON*</label>
+                <textarea id="policyRulesJson" class="form-control" rows="5" placeholder='{"vat_rate": 5, "requires_approval": true}'></textarea>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+                <button class="btn btn-primary" type="button" onclick="savePolicy()">Save Policy</button>
+                <button class="btn btn-secondary" type="button" onclick="resolvePolicy()">Resolve Policy</button>
+            </div>
+            <pre id="policyResolveOutput" class="json-box">Policy resolution output will appear here.</pre>
+
+            <div class="table-container" style="margin-top:16px">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Country</th>
+                            <th>State</th>
+                            <th>Area</th>
+                            <th>Entity</th>
+                            <th>Action</th>
+                            <th>Priority</th>
+                            <th>Rules</th>
+                        </tr>
+                    </thead>
+                    <tbody id="policyTable">
+                        <tr><td colspan="8" class="empty-state">Open this tab to load policies</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="outbox" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h3>Event Outbox</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="outboxStatus" class="form-control">
+                        <option value="">All</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Published">Published</option>
+                        <option value="Failed">Failed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Event Type</label>
+                    <input id="outboxEventType" class="form-control" placeholder="invoice.created">
+                </div>
+                <div class="form-group" style="align-self:flex-end">
+                    <button class="btn btn-secondary" type="button" onclick="loadOutbox()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Event Type</th>
+                            <th>Aggregate</th>
+                            <th>Status</th>
+                            <th>Retries</th>
+                            <th>Available</th>
+                            <th>Published</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outboxTable">
+                        <tr><td colspan="8" class="empty-state">Open this tab to load outbox events</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="kpi" class="tab-content">
+    <div class="card">
+        <div class="card-header">
+            <h3>KPI Mart</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Rebuild Date</label>
+                    <input id="kpiRebuildDate" class="form-control" type="date">
+                </div>
+                <div class="form-group" style="align-self:flex-end">
+                    <button class="btn btn-primary" type="button" onclick="rebuildKpis()">Rebuild Daily KPIs</button>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Metric Code</label>
+                    <input id="kpiMetricCode" class="form-control" placeholder="occupancy_rate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date From</label>
+                    <input id="kpiDateFrom" class="form-control" type="date">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date To</label>
+                    <input id="kpiDateTo" class="form-control" type="date">
+                </div>
+                <div class="form-group" style="align-self:flex-end">
+                    <button class="btn btn-secondary" type="button" onclick="loadKpis()">Load KPI Facts</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Currency</th>
+                            <th>Scope</th>
+                            <th>Scope ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kpiTable">
+                        <tr><td colspan="6" class="empty-state">Open this tab to load KPI facts</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -195,17 +351,37 @@
 
 {% block scripts %}
 <script>
+    const settingsTabLoaded = { policy: false, outbox: false, kpi: false };
+
+    function openSettingsTab(evt, tabName) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+
+        if (tabName === 'policy' && !settingsTabLoaded.policy) {
+            settingsTabLoaded.policy = true;
+            loadPolicies();
+        }
+        if (tabName === 'outbox' && !settingsTabLoaded.outbox) {
+            settingsTabLoaded.outbox = true;
+            loadOutbox();
+        }
+        if (tabName === 'kpi' && !settingsTabLoaded.kpi) {
+            settingsTabLoaded.kpi = true;
+            loadKpis();
+        }
+    }
+
     async function sendTestEmail() {
         const recipient = document.getElementById('testRecipient').value;
         if (!recipient) {
             showToast('Please enter a recipient email', 'error');
             return;
         }
-
         const btn = document.getElementById('testBtn');
         btn.disabled = true;
-        btn.innerText = '⌛ Sending...';
-
+        btn.innerText = 'Sending...';
         try {
             const resp = await apiFetch('/api/system/email/test', {
                 method: 'POST',
@@ -216,25 +392,269 @@
             showToast(e.message, 'error');
         } finally {
             btn.disabled = false;
-            btn.innerText = '📧 Send Test Email';
+            btn.innerText = 'Send Test Email';
         }
     }
 
     function setTheme(themeId) {
         document.documentElement.setAttribute('data-theme', themeId);
         localStorage.setItem('app-theme', themeId);
-
-        // Update UI
         document.querySelectorAll('.theme-tile').forEach(t => t.classList.remove('active'));
         const activeTile = document.getElementById(`theme-${themeId}`);
         if (activeTile) activeTile.classList.add('active');
     }
 
-    // Initialize active theme tile
-    (function () {
+    function queryString(params) {
+        const q = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && String(v).trim() !== '') q.set(k, v);
+        });
+        const s = q.toString();
+        return s ? `?${s}` : '';
+    }
+
+    function safeJson(obj) {
+        return JSON.stringify(obj, null, 2);
+    }
+
+    async function loadPolicies() {
+        const country = document.getElementById('policyFilterCountry').value.toUpperCase();
+        const area = document.getElementById('policyFilterArea').value;
+        const url = '/api/system/country-policies' + queryString({
+            country_code: country || undefined,
+            policy_area: area || undefined
+        });
+        setTableState('policyTable', 8, 'Loading policies...');
+        try {
+            const data = await apiFetch(url);
+            const tbody = document.getElementById('policyTable');
+            if (!data.items || !data.items.length) {
+                setTableState('policyTable', 8, 'No policies found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(p => `
+                <tr>
+                    <td>${p.id}</td>
+                    <td>${p.country_code || '-'}</td>
+                    <td>${p.state_code || '-'}</td>
+                    <td>${p.policy_area || '-'}</td>
+                    <td>${p.entity_type || '-'}</td>
+                    <td>${p.action_name || '-'}</td>
+                    <td>${p.priority ?? '-'}</td>
+                    <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">${safeJson(p.rules_json || {})}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            setTableState('policyTable', 8, 'Could not load policies');
+            showToast(e.message || 'Failed to load policies', 'error');
+        }
+    }
+
+    async function savePolicy() {
+        const rawRules = document.getElementById('policyRulesJson').value.trim();
+        let rulesJson = {};
+        try {
+            rulesJson = rawRules ? JSON.parse(rawRules) : {};
+        } catch {
+            showToast('Rules JSON is invalid', 'error');
+            return;
+        }
+        const body = {
+            country_code: document.getElementById('policyCountryCode').value.toUpperCase().trim(),
+            state_code: document.getElementById('policyStateCode').value.trim() || null,
+            policy_area: document.getElementById('policyArea').value,
+            entity_type: document.getElementById('policyEntityType').value.trim(),
+            action_name: document.getElementById('policyActionName').value.trim(),
+            priority: parseInt(document.getElementById('policyPriority').value || '100', 10),
+            effective_from: document.getElementById('policyEffectiveFrom').value || null,
+            effective_to: document.getElementById('policyEffectiveTo').value || null,
+            rules_json: rulesJson
+        };
+        if (!body.country_code || !body.entity_type || !body.action_name) {
+            showToast('Country, Entity Type and Action Name are required', 'error');
+            return;
+        }
+        try {
+            await apiFetch('/api/system/country-policies', {
+                method: 'POST',
+                body: JSON.stringify(body)
+            });
+            showToast('Policy saved');
+            loadPolicies();
+        } catch (e) {
+            showToast(e.message || 'Failed to save policy', 'error');
+        }
+    }
+
+    async function resolvePolicy() {
+        const body = {
+            country_code: document.getElementById('policyCountryCode').value.toUpperCase().trim(),
+            state_code: document.getElementById('policyStateCode').value.trim() || null,
+            policy_area: document.getElementById('policyArea').value,
+            entity_type: document.getElementById('policyEntityType').value.trim(),
+            action_name: document.getElementById('policyActionName').value.trim(),
+            effective_on: document.getElementById('policyEffectiveFrom').value || null
+        };
+        try {
+            const result = await apiFetch('/api/system/country-policies/resolve', {
+                method: 'POST',
+                body: JSON.stringify(body)
+            });
+            document.getElementById('policyResolveOutput').textContent = safeJson(result);
+        } catch (e) {
+            showToast(e.message || 'Failed to resolve policy', 'error');
+        }
+    }
+
+    async function loadOutbox() {
+        const status = document.getElementById('outboxStatus').value;
+        const eventType = document.getElementById('outboxEventType').value.trim();
+        const url = '/api/system/event-outbox' + queryString({
+            status: status || undefined,
+            event_type: eventType || undefined,
+            limit: 200
+        });
+        setTableState('outboxTable', 8, 'Loading outbox events...');
+        try {
+            const data = await apiFetch(url);
+            const tbody = document.getElementById('outboxTable');
+            if (!data.items || !data.items.length) {
+                setTableState('outboxTable', 8, 'No outbox events found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(e => `
+                <tr>
+                    <td>${e.id}</td>
+                    <td>${e.event_type}</td>
+                    <td>${e.aggregate_type} #${e.aggregate_id}</td>
+                    <td>${statusBadge(e.status)}</td>
+                    <td>${e.retries ?? 0}</td>
+                    <td>${e.available_at ? new Date(e.available_at).toLocaleString() : '-'}</td>
+                    <td>${e.published_at ? new Date(e.published_at).toLocaleString() : '-'}</td>
+                    <td>${e.status !== 'Published' ? `<button class="btn btn-sm btn-secondary" onclick="markPublished(${e.id})">Mark Published</button>` : '-'}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            setTableState('outboxTable', 8, 'Could not load outbox events');
+            showToast(e.message || 'Failed to load outbox', 'error');
+        }
+    }
+
+    async function markPublished(id) {
+        try {
+            await apiFetch(`/api/system/event-outbox/${id}/mark-published`, { method: 'POST' });
+            showToast('Event marked as published');
+            loadOutbox();
+        } catch (e) {
+            showToast(e.message || 'Failed to update event', 'error');
+        }
+    }
+
+    async function rebuildKpis() {
+        const dateVal = document.getElementById('kpiRebuildDate').value;
+        const url = '/api/dashboard/kpi/rebuild-daily' + (dateVal ? `?for_date=${encodeURIComponent(dateVal)}` : '');
+        try {
+            const data = await apiFetch(url, { method: 'POST' });
+            showToast(`${data.message} (${data.metrics_inserted} metrics)`);
+            loadKpis();
+        } catch (e) {
+            showToast(e.message || 'Failed to rebuild KPIs', 'error');
+        }
+    }
+
+    async function loadKpis() {
+        const metric = document.getElementById('kpiMetricCode').value.trim();
+        const dateFrom = document.getElementById('kpiDateFrom').value;
+        const dateTo = document.getElementById('kpiDateTo').value;
+        const url = '/api/dashboard/kpi/daily' + queryString({
+            metric_code: metric || undefined,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined
+        });
+        setTableState('kpiTable', 6, 'Loading KPI facts...');
+        try {
+            const data = await apiFetch(url);
+            const tbody = document.getElementById('kpiTable');
+            if (!data.items || !data.items.length) {
+                setTableState('kpiTable', 6, 'No KPI facts found');
+                return;
+            }
+            tbody.innerHTML = data.items.map(k => `
+                <tr>
+                    <td>${k.fact_date || '-'}</td>
+                    <td>${k.metric_code || '-'}</td>
+                    <td>${k.metric_value ?? 0}</td>
+                    <td>${k.currency || '-'}</td>
+                    <td>${k.scope_type || '-'}</td>
+                    <td>${k.scope_id ?? '-'}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            setTableState('kpiTable', 6, 'Could not load KPI facts');
+            showToast(e.message || 'Failed to load KPI facts', 'error');
+        }
+    }
+
+    (function initSettingsPage() {
         const currentTheme = localStorage.getItem('app-theme') || 'dark-midnight';
         const activeTile = document.getElementById(`theme-${currentTheme}`);
         if (activeTile) activeTile.classList.add('active');
+        const today = new Date().toISOString().split('T')[0];
+        const rebuildDate = document.getElementById('kpiRebuildDate');
+        const dateTo = document.getElementById('kpiDateTo');
+        if (rebuildDate) rebuildDate.value = today;
+        if (dateTo) dateTo.value = today;
     })();
 </script>
+<style>
+    .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 20px;
+        margin-top: 15px;
+    }
+
+    .theme-tile {
+        cursor: pointer;
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        transition: var(--transition);
+        border: 2px solid transparent;
+    }
+
+    .theme-tile:hover {
+        transform: translateY(-3px);
+    }
+
+    .theme-tile.active {
+        border-color: var(--accent);
+        background: rgba(108, 92, 231, 0.05);
+    }
+
+    .theme-preview {
+        height: 100px;
+        display: flex;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+
+    .theme-label {
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 4px;
+    }
+
+    .json-box {
+        border: 1px solid var(--border);
+        background: var(--bg-input);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+        max-height: 260px;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+    }
+</style>
 {% endblock %}

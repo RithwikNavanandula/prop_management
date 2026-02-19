@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.leasing.models import Lease, RentSchedule, SecurityDeposit, LeaseUnitLink
 from app.modules.properties.models import Unit
+from app.utils.event_service import emit_outbox_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -95,6 +96,23 @@ def create_lease(data: dict, db: Session = Depends(get_db), user: UserAccount = 
                 allocated_rent=lease.base_rent_amount
             )
             db.add(link)
+
+        emit_outbox_event(
+            db=db,
+            tenant_org_id=user.tenant_org_id,
+            event_type="lease.created",
+            aggregate_type="Lease",
+            aggregate_id=lease.id,
+            payload={
+                "lease_number": lease.lease_number,
+                "property_id": lease.property_id,
+                "unit_id": lease.unit_id,
+                "tenant_id": lease.tenant_id,
+                "start_date": str(lease.start_date) if lease.start_date else None,
+                "end_date": str(lease.end_date) if lease.end_date else None,
+            },
+            event_key=f"lease.created.{lease.id}",
+        )
 
         db.commit()
         db.refresh(lease)

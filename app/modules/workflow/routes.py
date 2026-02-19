@@ -8,9 +8,11 @@ from app.database import get_db
 from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.modules.workflow.models import (
-    WorkflowDefinition, WorkflowExecutionLog, JobSchedule, JobExecutionLog
+    WorkflowDefinition, WorkflowExecutionLog, JobSchedule, JobExecutionLog,
+    WorkflowInstance, WorkflowTask
 )
 from app.utils.scheduler_service import scheduler
+from app.utils.event_service import emit_outbox_event
 
 router = APIRouter(
     prefix="/api/workflow",
@@ -60,6 +62,13 @@ def _sanitize_workflow_data(data: dict) -> dict:
         else:
             clean[k] = v
     return clean
+
+
+def _instance_query_for_user(db: Session, user: UserAccount):
+    q = db.query(WorkflowInstance)
+    if user.tenant_org_id:
+        q = q.filter(WorkflowInstance.tenant_org_id == user.tenant_org_id)
+    return q
 
 
 # --- Definitions ---
@@ -140,6 +149,170 @@ def list_logs(
         
     items = q.order_by(WorkflowExecutionLog.triggered_at.desc()).limit(100).all()
     return {"total": len(items), "items": [_dict(x) for x in items]}
+
+
+@router.get("/instances")
+def list_instances(
+    status: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    q = _instance_query_for_user(db, user)
+    if status:
+        q = q.filter(WorkflowInstance.status == status)
+    if entity_type:
+        q = q.filter(WorkflowInstance.entity_type == entity_type)
+    if entity_id:
+        q = q.filter(WorkflowInstance.entity_id == entity_id)
+    items = q.order_by(WorkflowInstance.id.desc()).limit(500).all()
+    return {"total": len(items), "items": [_dict(x) for x in items]}
+
+
+@router.post("/instances", status_code=201)
+def create_instance(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    workflow_definition_id = data.get("workflow_definition_id")
+    entity_type = data.get("entity_type")
+    entity_id = data.get("entity_id")
+    if not workflow_definition_id or not entity_type or entity_id in (None, ""):
+        raise HTTPException(400, "workflow_definition_id, entity_type, entity_id are required")
+
+    wf_q = _workflow_query_for_user(db, user).filter(WorkflowDefinition.id == int(workflow_definition_id))
+    wf = wf_q.first()
+    if not wf:
+        raise HTTPException(404, "Workflow definition not found")
+
+    inst = WorkflowInstance(
+        tenant_org_id=user.tenant_org_id,
+        workflow_definition_id=wf.id,
+        entity_type=str(entity_type),
+        entity_id=int(entity_id),
+        status=data.get("status", "Running"),
+        current_step_no=int(data.get("current_step_no", 1)),
+        started_by=user.id,
+        context_json=data.get("context_json"),
+    )
+    db.add(inst)
+    db.flush()
+
+    first_task_name = data.get("first_task_name") or f"{wf.workflow_name} Approval"
+    if data.get("create_initial_task", True):
+        db.add(WorkflowTask(
+            tenant_org_id=user.tenant_org_id,
+            workflow_instance_id=inst.id,
+            task_name=first_task_name,
+            assigned_role=data.get("assigned_role"),
+            assigned_user_id=data.get("assigned_user_id"),
+            status="Pending",
+        ))
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="workflow.instance.created",
+        aggregate_type="WorkflowInstance",
+        aggregate_id=inst.id,
+        payload={"workflow_definition_id": wf.id, "entity_type": inst.entity_type, "entity_id": inst.entity_id},
+        event_key=f"workflow.instance.created.{inst.id}",
+    )
+    db.commit()
+    db.refresh(inst)
+    return _dict(inst)
+
+
+@router.get("/instances/{instance_id}")
+def get_instance(instance_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    inst = _instance_query_for_user(db, user).filter(WorkflowInstance.id == instance_id).first()
+    if not inst:
+        raise HTTPException(404, "Workflow instance not found")
+    d = _dict(inst)
+    tasks = db.query(WorkflowTask).filter(WorkflowTask.workflow_instance_id == inst.id).order_by(WorkflowTask.id.asc()).all()
+    d["tasks"] = [_dict(t) for t in tasks]
+    return d
+
+
+@router.get("/instances/{instance_id}/tasks")
+def list_instance_tasks(instance_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    inst = _instance_query_for_user(db, user).filter(WorkflowInstance.id == instance_id).first()
+    if not inst:
+        raise HTTPException(404, "Workflow instance not found")
+    items = db.query(WorkflowTask).filter(WorkflowTask.workflow_instance_id == instance_id).order_by(WorkflowTask.id.asc()).all()
+    return {"total": len(items), "items": [_dict(x) for x in items]}
+
+
+@router.post("/instances/{instance_id}/tasks", status_code=201)
+def create_instance_task(instance_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    inst = _instance_query_for_user(db, user).filter(WorkflowInstance.id == instance_id).first()
+    if not inst:
+        raise HTTPException(404, "Workflow instance not found")
+    if not data.get("task_name"):
+        raise HTTPException(400, "task_name is required")
+    task = WorkflowTask(
+        tenant_org_id=user.tenant_org_id,
+        workflow_instance_id=instance_id,
+        task_name=data["task_name"],
+        assigned_role=data.get("assigned_role"),
+        assigned_user_id=data.get("assigned_user_id"),
+        status=data.get("status", "Pending"),
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return _dict(task)
+
+
+@router.put("/tasks/{task_id}")
+def update_task(task_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(WorkflowTask).filter(WorkflowTask.id == task_id)
+    if user.tenant_org_id:
+        q = q.filter(WorkflowTask.tenant_org_id == user.tenant_org_id)
+    task = q.first()
+    if not task:
+        raise HTTPException(404, "Workflow task not found")
+    for k, v in data.items():
+        if hasattr(task, k) and k not in ("id", "tenant_org_id", "workflow_instance_id", "created_at"):
+            setattr(task, k, v)
+    db.commit()
+    db.refresh(task)
+    return _dict(task)
+
+
+@router.post("/tasks/{task_id}/complete")
+def complete_task(task_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(WorkflowTask).filter(WorkflowTask.id == task_id)
+    if user.tenant_org_id:
+        q = q.filter(WorkflowTask.tenant_org_id == user.tenant_org_id)
+    task = q.first()
+    if not task:
+        raise HTTPException(404, "Workflow task not found")
+    decision = data.get("decision", "Completed")
+    task.status = "Completed"
+    task.decision = decision
+    task.decision_notes = data.get("decision_notes")
+    task.completed_by = user.id
+    task.completed_at = datetime.utcnow()
+
+    inst = _instance_query_for_user(db, user).filter(WorkflowInstance.id == task.workflow_instance_id).first()
+    if inst:
+        open_tasks = db.query(WorkflowTask).filter(
+            WorkflowTask.workflow_instance_id == inst.id,
+            WorkflowTask.status.in_(["Pending", "InProgress"])
+        ).count()
+        if open_tasks == 0:
+            inst.status = "Completed"
+            inst.completed_at = datetime.utcnow()
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="workflow.task.completed",
+        aggregate_type="WorkflowTask",
+        aggregate_id=task.id,
+        payload={"workflow_instance_id": task.workflow_instance_id, "decision": decision},
+        event_key=f"workflow.task.completed.{task.id}",
+    )
+    db.commit()
+    db.refresh(task)
+    return _dict(task)
 
 
 # --- Job Schedules ---

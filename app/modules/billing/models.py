@@ -136,3 +136,37 @@ class FxRevaluationLine(Base):
     revalued_amount = Column(Numeric(14, 2))
     gain_loss = Column(Numeric(14, 2))
     created_at = Column(DateTime, server_default=func.now())
+
+
+class FxRateSnapshot(Base):
+    __tablename__ = "fx_rate_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"), nullable=False)
+    snapshot_date = Column(Date, nullable=False, index=True)
+    from_currency = Column(String(10), nullable=False)
+    to_currency = Column(String(10), nullable=False)
+    rate = Column(Numeric(18, 8), nullable=False)
+    source = Column(String(30), default="Manual")
+    exchange_rate_daily_id = Column(Integer, ForeignKey("exchange_rates_daily.id"))
+    created_by = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class MultiCurrencyLedgerEntry(Base):
+    __tablename__ = "multi_currency_ledger_entries"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"), nullable=False)
+    legal_entity_id = Column(Integer, ForeignKey("legal_entities.id"))
+    reference_type = Column(String(50), nullable=False)  # Invoice/Payment/Revaluation
+    reference_id = Column(Integer, nullable=False)
+    posting_date = Column(Date, nullable=False)
+    txn_currency = Column(String(10), nullable=False)
+    txn_amount = Column(Numeric(14, 2), nullable=False)
+    base_currency = Column(String(10), nullable=False)
+    base_amount = Column(Numeric(14, 2), nullable=False)
+    fx_rate = Column(Numeric(18, 8), nullable=False)
+    fx_snapshot_id = Column(Integer, ForeignKey("fx_rate_snapshots.id"))
+    entry_side = Column(String(10), default="Debit")  # Debit/Credit
+    notes = Column(Text)
+    created_by = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())

@@ -104,3 +104,56 @@ class PaymentIntent(Base):
     raw_response = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class LegalEntity(Base):
+    __tablename__ = "legal_entities"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"), nullable=False)
+    entity_code = Column(String(50), nullable=False)
+    entity_name = Column(String(200), nullable=False)
+    country_code = Column(String(2))
+    registration_number = Column(String(100))
+    tax_registration_no = Column(String(100))
+    base_currency = Column(String(10), default="USD")
+    timezone = Column(String(50), default="UTC")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class CountryPolicy(Base):
+    __tablename__ = "country_policies"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"), nullable=False)
+    country_code = Column(String(2), nullable=False)
+    state_code = Column(String(50))
+    policy_area = Column(String(50), nullable=False)  # tax/legal/workflow/compliance
+    entity_type = Column(String(50), nullable=False)  # Lease/Invoice/Property/etc.
+    action_name = Column(String(100), nullable=False)  # create_lease/post_invoice/etc.
+    priority = Column(Integer, default=100)
+    rules_json = Column(JSON, nullable=False)
+    is_active = Column(Boolean, default=True)
+    effective_from = Column(Date)
+    effective_to = Column(Date)
+    version_no = Column(Integer, default=1)
+    created_by = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class EventOutbox(Base):
+    __tablename__ = "event_outbox"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    event_type = Column(String(100), nullable=False, index=True)
+    aggregate_type = Column(String(50), nullable=False)
+    aggregate_id = Column(Integer, nullable=False)
+    event_key = Column(String(200))
+    payload = Column(JSON, nullable=False)
+    status = Column(String(20), default="Pending")  # Pending/Processing/Published/Failed
+    retries = Column(Integer, default=0)
+    available_at = Column(DateTime, server_default=func.now())
+    published_at = Column(DateTime)
+    error_message = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())

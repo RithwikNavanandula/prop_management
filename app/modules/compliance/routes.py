@@ -11,8 +11,10 @@ from app.auth.dependencies import get_current_user, require_permissions
 from app.auth.models import UserAccount
 from app.config import get_settings
 from app.modules.compliance.models import (
-    ComplianceRequirement, Document, DocumentType, Inspection, ComplianceItem
+    ComplianceRequirement, Document, DocumentType, Inspection, ComplianceItem,
+    DocumentVersion, DocumentObligation
 )
+from app.utils.event_service import emit_outbox_event
 
 router = APIRouter(
     prefix="/api/compliance",
@@ -133,6 +135,44 @@ def _document_query_for_user(db: Session, user: UserAccount):
     if user.tenant_org_id:
         q = q.filter(Document.tenant_org_id == user.tenant_org_id)
     return q
+
+
+def _create_initial_document_version(db: Session, user: UserAccount, doc: Document, notes: Optional[str] = None):
+    version_no = int(doc.version_number or 1)
+    ver = DocumentVersion(
+        tenant_org_id=user.tenant_org_id,
+        document_id=doc.id,
+        version_number=version_no,
+        file_name=doc.file_name,
+        file_path=doc.file_path,
+        mime_type=doc.mime_type,
+        notes=notes,
+        uploaded_by=user.id,
+    )
+    db.add(ver)
+    return ver
+
+
+def _create_document_expiry_obligation(db: Session, user: UserAccount, doc: Document):
+    if not doc.expiry_date:
+        return None
+    existing = db.query(DocumentObligation).filter(
+        DocumentObligation.document_id == doc.id,
+        DocumentObligation.obligation_type == "Expiry",
+        DocumentObligation.status.in_(["Open", "Overdue"])
+    ).first()
+    if existing:
+        return existing
+    ob = DocumentObligation(
+        tenant_org_id=user.tenant_org_id,
+        document_id=doc.id,
+        obligation_type="Expiry",
+        due_date=doc.expiry_date,
+        status="Open",
+        notes="Auto-generated from document expiry date",
+    )
+    db.add(ob)
+    return ob
 
 
 # --- Requirements ---
@@ -258,6 +298,18 @@ def create_document(data: dict, db: Session = Depends(get_db), user: UserAccount
     if user.tenant_org_id:
         doc.tenant_org_id = user.tenant_org_id
     db.add(doc)
+    db.flush()
+    _create_initial_document_version(db, user, doc, notes="Initial document metadata/version")
+    _create_document_expiry_obligation(db, user, doc)
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="document.created",
+        aggregate_type="Document",
+        aggregate_id=doc.id,
+        payload={"owner_entity_type": doc.owner_entity_type, "owner_entity_id": doc.owner_entity_id, "file_name": doc.file_name},
+        event_key=f"document.created.{doc.id}",
+    )
     db.commit()
     db.refresh(doc)
     return _dict(doc)
@@ -299,6 +351,18 @@ async def upload_document(
         is_signed=bool(is_signed),
     )
     db.add(doc)
+    db.flush()
+    _create_initial_document_version(db, user, doc, notes="Initial uploaded document version")
+    _create_document_expiry_obligation(db, user, doc)
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="document.uploaded",
+        aggregate_type="Document",
+        aggregate_id=doc.id,
+        payload={"owner_entity_type": doc.owner_entity_type, "owner_entity_id": doc.owner_entity_id, "file_name": doc.file_name},
+        event_key=f"document.uploaded.{doc.id}",
+    )
     db.commit()
     db.refresh(doc)
     return _dict(doc)
@@ -317,9 +381,149 @@ def delete_document(doc_id: int, db: Session = Depends(get_db), user: UserAccoun
         if absolute_path.startswith(upload_root) and os.path.exists(absolute_path):
             os.remove(absolute_path)
 
+    versions = db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id).all()
+    for v in versions:
+        if v.file_path and isinstance(v.file_path, str) and v.file_path.startswith("/uploads/"):
+            upload_root = _compliance_upload_dir()
+            relative_path = v.file_path.replace("/uploads/", "", 1)
+            absolute_path = os.path.abspath(os.path.join(upload_root, relative_path))
+            if absolute_path.startswith(upload_root) and os.path.exists(absolute_path):
+                os.remove(absolute_path)
+        db.delete(v)
+    db.query(DocumentObligation).filter(DocumentObligation.document_id == doc.id).delete(synchronize_session=False)
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="document.deleted",
+        aggregate_type="Document",
+        aggregate_id=doc.id,
+        payload={"document_id": doc.id, "file_name": doc.file_name},
+        event_key=f"document.deleted.{doc.id}",
+    )
     db.delete(doc)
     db.commit()
     return {"message": "Document deleted"}
+
+
+@router.get("/documents/{doc_id}/versions")
+def list_document_versions(doc_id: int, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    doc = _document_query_for_user(db, user).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    q = db.query(DocumentVersion).filter(DocumentVersion.document_id == doc_id)
+    if user.tenant_org_id:
+        q = q.filter(DocumentVersion.tenant_org_id == user.tenant_org_id)
+    items = q.order_by(DocumentVersion.version_number.desc(), DocumentVersion.id.desc()).all()
+    return {"total": len(items), "items": [_dict(x) for x in items]}
+
+
+@router.post("/documents/{doc_id}/versions/upload", status_code=201)
+async def upload_document_version(
+    doc_id: int,
+    file: UploadFile = File(...),
+    notes: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    doc = _document_query_for_user(db, user).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    safe_name = os.path.basename(file.filename or "document")
+    ext = os.path.splitext(safe_name)[1]
+    stored_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid4().hex[:8]}{ext}"
+    tenant_folder = str(user.tenant_org_id) if user.tenant_org_id else "global"
+    upload_root = _compliance_upload_dir()
+    save_dir = os.path.join(upload_root, "compliance", tenant_folder)
+    os.makedirs(save_dir, exist_ok=True)
+    absolute_path = os.path.join(save_dir, stored_name)
+    with open(absolute_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    current_max = db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id).order_by(
+        DocumentVersion.version_number.desc()
+    ).first()
+    next_version = int(current_max.version_number) + 1 if current_max else int(doc.version_number or 1) + 1
+
+    doc.file_name = safe_name
+    doc.file_path = f"/uploads/compliance/{tenant_folder}/{stored_name}"
+    doc.mime_type = file.content_type
+    doc.version_number = next_version
+    db.add(DocumentVersion(
+        tenant_org_id=user.tenant_org_id,
+        document_id=doc.id,
+        version_number=next_version,
+        file_name=doc.file_name,
+        file_path=doc.file_path,
+        mime_type=doc.mime_type,
+        notes=notes,
+        uploaded_by=user.id,
+    ))
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="document.version_uploaded",
+        aggregate_type="Document",
+        aggregate_id=doc.id,
+        payload={"document_id": doc.id, "version_number": next_version},
+        event_key=f"document.version_uploaded.{doc.id}.{next_version}",
+    )
+    db.commit()
+    db.refresh(doc)
+    return _dict(doc)
+
+
+@router.get("/obligations")
+def list_document_obligations(
+    status: Optional[str] = None,
+    obligation_type: Optional[str] = None,
+    due_before: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    q = db.query(DocumentObligation)
+    if user.tenant_org_id:
+        q = q.filter(DocumentObligation.tenant_org_id == user.tenant_org_id)
+    if status:
+        q = q.filter(DocumentObligation.status == status)
+    if obligation_type:
+        q = q.filter(DocumentObligation.obligation_type == obligation_type)
+    if due_before:
+        q = q.filter(DocumentObligation.due_date <= _parse_iso_date(due_before, "due_before"))
+    items = q.order_by(DocumentObligation.due_date.asc(), DocumentObligation.id.desc()).all()
+    return {"total": len(items), "items": [_dict(x) for x in items]}
+
+
+@router.post("/obligations", status_code=201)
+def create_document_obligation(data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    payload = {k: v for k, v in data.items() if hasattr(DocumentObligation, k)}
+    if not payload.get("document_id") or not payload.get("obligation_type") or not payload.get("due_date"):
+        raise HTTPException(400, "document_id, obligation_type and due_date are required")
+    payload["due_date"] = _parse_iso_date(payload.get("due_date"), "due_date")
+    item = DocumentObligation(**payload)
+    if user.tenant_org_id:
+        item.tenant_org_id = user.tenant_org_id
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return _dict(item)
+
+
+@router.post("/obligations/{obligation_id}/complete")
+def complete_document_obligation(obligation_id: int, data: dict, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    q = db.query(DocumentObligation).filter(DocumentObligation.id == obligation_id)
+    if user.tenant_org_id:
+        q = q.filter(DocumentObligation.tenant_org_id == user.tenant_org_id)
+    item = q.first()
+    if not item:
+        raise HTTPException(404, "Obligation not found")
+    item.status = data.get("status", "Completed")
+    item.notes = data.get("notes", item.notes)
+    item.completed_by = user.id
+    item.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(item)
+    return _dict(item)
 
 
 # --- Inspections ---

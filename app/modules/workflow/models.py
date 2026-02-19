@@ -95,3 +95,36 @@ class JobExecutionLog(Base):
     status = Column(String(20), default="Running")  # Running, Completed, Failed
     completed_at = Column(DateTime)
     error_message = Column(Text)
+
+
+class WorkflowInstance(Base):
+    __tablename__ = "workflow_instances"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    workflow_definition_id = Column(Integer, ForeignKey("workflow_definitions.id"), nullable=False)
+    entity_type = Column(String(50), nullable=False)  # Lease/Invoice/WorkOrder/etc.
+    entity_id = Column(Integer, nullable=False)
+    status = Column(String(20), default="Running")  # Running/Completed/Cancelled/Failed
+    current_step_no = Column(Integer, default=1)
+    started_by = Column(Integer)
+    started_at = Column(DateTime, server_default=func.now())
+    completed_at = Column(DateTime)
+    context_json = Column(JSON)
+    error_message = Column(Text)
+
+
+class WorkflowTask(Base):
+    __tablename__ = "workflow_tasks"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    workflow_instance_id = Column(Integer, ForeignKey("workflow_instances.id"), nullable=False)
+    task_name = Column(String(200), nullable=False)
+    assigned_role = Column(String(50))
+    assigned_user_id = Column(Integer)
+    due_at = Column(DateTime)
+    status = Column(String(20), default="Pending")  # Pending/InProgress/Approved/Rejected/Completed
+    decision = Column(String(20))
+    decision_notes = Column(Text)
+    completed_by = Column(Integer)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())

@@ -13,6 +13,7 @@ from app.modules.leasing.models import Lease, RentSchedule
 from app.modules.billing.models import Invoice, Payment
 from app.modules.maintenance.models import MaintenanceRequest, WorkOrder
 from app.modules.accounting.models import OwnerDistribution
+from app.dashboards.models import KPIDailyFact
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -27,6 +28,16 @@ def _tenant_filter(q, model, user):
     if user.tenant_org_id and hasattr(model, "tenant_org_id"):
         return q.filter(model.tenant_org_id == user.tenant_org_id)
     return q
+
+
+def _parse_date(v):
+    if v in (None, ""):
+        return None
+    if isinstance(v, date):
+        return v
+    if isinstance(v, str):
+        return date.fromisoformat(v)
+    return None
 
 
 @router.get("/portfolio")
@@ -239,3 +250,81 @@ def vendor_dashboard(db: Session = Depends(get_db), user: UserAccount = Depends(
         "pending_payments": 0.0,
         "performance_rating": 4.8,
     }
+
+
+@router.post("/kpi/rebuild-daily")
+def rebuild_daily_kpis(for_date: Optional[str] = None, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    """Populate KPI mart for a date from transactional tables."""
+    fact_date = _parse_date(for_date) or date.today()
+    if not user.tenant_org_id:
+        raise HTTPException(status_code=400, detail="User not associated with tenant org")
+
+    existing_q = db.query(KPIDailyFact).filter(
+        KPIDailyFact.tenant_org_id == user.tenant_org_id,
+        KPIDailyFact.fact_date == fact_date,
+        KPIDailyFact.scope_type == "Tenant",
+    )
+    existing_q.delete(synchronize_session=False)
+
+    unit_q = _tenant_filter(db.query(Unit).filter(Unit.is_deleted == False), Unit, user)
+    total_units = unit_q.count()
+    occupied = unit_q.filter(Unit.current_status == "Occupied").count()
+    occupancy_rate = round((occupied / total_units * 100) if total_units else 0, 4)
+
+    inv_q = _tenant_filter(db.query(sqlfunc.coalesce(sqlfunc.sum(Invoice.total_amount), 0)).filter(
+        Invoice.invoice_date <= fact_date
+    ), Invoice, user)
+    total_invoiced = float(inv_q.scalar() or 0)
+
+    pay_q = _tenant_filter(db.query(sqlfunc.coalesce(sqlfunc.sum(Payment.amount), 0)).filter(
+        Payment.payment_date <= fact_date
+    ), Payment, user)
+    total_collected = float(pay_q.scalar() or 0)
+
+    open_maint_q = _tenant_filter(db.query(sqlfunc.count(MaintenanceRequest.id)).filter(
+        MaintenanceRequest.status.in_(["New", "Acknowledged", "InProgress"])
+    ), MaintenanceRequest, user)
+    open_maint = float(open_maint_q.scalar() or 0)
+
+    metrics = [
+        ("occupancy_rate", occupancy_rate, None),
+        ("total_invoiced", total_invoiced, "USD"),
+        ("total_collected", total_collected, "USD"),
+        ("open_maintenance_requests", open_maint, None),
+    ]
+    for metric_code, metric_value, currency in metrics:
+        db.add(KPIDailyFact(
+            tenant_org_id=user.tenant_org_id,
+            fact_date=fact_date,
+            scope_type="Tenant",
+            scope_id=user.tenant_org_id,
+            metric_code=metric_code,
+            metric_value=metric_value,
+            currency=currency,
+            dimensions={"source": "rebuild_daily_kpis"},
+        ))
+    db.commit()
+    return {"message": "KPI mart rebuilt", "fact_date": str(fact_date), "metrics_inserted": len(metrics)}
+
+
+@router.get("/kpi/daily")
+def list_daily_kpis(
+    metric_code: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    q = db.query(KPIDailyFact)
+    if user.tenant_org_id:
+        q = q.filter(KPIDailyFact.tenant_org_id == user.tenant_org_id)
+    if metric_code:
+        q = q.filter(KPIDailyFact.metric_code == metric_code)
+    d_from = _parse_date(date_from)
+    d_to = _parse_date(date_to)
+    if d_from:
+        q = q.filter(KPIDailyFact.fact_date >= d_from)
+    if d_to:
+        q = q.filter(KPIDailyFact.fact_date <= d_to)
+    items = q.order_by(KPIDailyFact.fact_date.desc(), KPIDailyFact.id.desc()).limit(2000).all()
+    return {"total": len(items), "items": [{c.name: getattr(x, c.name) for c in x.__table__.columns} for x in items]}

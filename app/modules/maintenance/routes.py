@@ -11,6 +11,7 @@ from app.modules.maintenance.models import (
     MaintenanceRequest, WorkOrder, MaintenanceSLA, MaintenanceAttachment,
     Resource, ResourceAllocation, ConsumableRequest, TenantFeedback
 )
+from app.utils.event_service import emit_outbox_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -49,6 +50,22 @@ def create_request(data: dict, db: Session = Depends(get_db), user: UserAccount 
     if user.tenant_org_id:
         req.tenant_org_id = user.tenant_org_id
     db.add(req)
+    db.flush()
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="maintenance.request.created",
+        aggregate_type="MaintenanceRequest",
+        aggregate_id=req.id,
+        payload={
+            "property_id": req.property_id,
+            "unit_id": req.unit_id,
+            "tenant_id": req.tenant_id,
+            "priority": req.priority,
+            "status": req.status,
+        },
+        event_key=f"maintenance.request.created.{req.id}",
+    )
     db.commit()
     db.refresh(req)
     return _to_dict(req)
@@ -110,6 +127,16 @@ def create_work_order(data: dict, db: Session = Depends(get_db), user: UserAccou
     if user.tenant_org_id:
         wo.tenant_org_id = user.tenant_org_id
     db.add(wo)
+    db.flush()
+    emit_outbox_event(
+        db=db,
+        tenant_org_id=user.tenant_org_id,
+        event_type="maintenance.work_order.created",
+        aggregate_type="WorkOrder",
+        aggregate_id=wo.id,
+        payload={"request_id": wo.request_id, "status": wo.status, "priority": wo.priority},
+        event_key=f"maintenance.work_order.created.{wo.id}",
+    )
     db.commit()
     db.refresh(wo)
     return _to_dict(wo)

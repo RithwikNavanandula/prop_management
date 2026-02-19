@@ -72,3 +72,34 @@ class Inspection(Base):
     status = Column(String(20), default="Scheduled")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    file_name = Column(String(300))
+    file_path = Column(String(500))
+    mime_type = Column(String(100))
+    checksum = Column(String(128))
+    notes = Column(Text)
+    uploaded_by = Column(Integer)
+    uploaded_at = Column(DateTime, server_default=func.now())
+
+
+class DocumentObligation(Base):
+    __tablename__ = "document_obligations"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_org_id = Column(Integer, ForeignKey("tenant_orgs.id"))
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    obligation_type = Column(String(50), nullable=False)  # Expiry/Renewal/Regulatory
+    due_date = Column(Date, nullable=False)
+    status = Column(String(20), default="Open")  # Open/Completed/Waived/Overdue
+    assigned_to = Column(Integer)
+    notes = Column(Text)
+    completed_by = Column(Integer)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

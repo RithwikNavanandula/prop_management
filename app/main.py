@@ -46,6 +46,7 @@ from app.modules.compliance import models as _cpm
 from app.modules.workflow import models as _wm
 from app.modules.utilities import models as _um
 from app.modules.system import models as _sm
+from app.dashboards import models as _dm
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
